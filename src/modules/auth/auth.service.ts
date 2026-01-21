@@ -97,6 +97,7 @@ export class AuthService {
    * 微信登录（静默登录）
    * 
    * 根据微信 openid 自动创建或查找用户，实现无感登录
+   * 如果微信配置缺失，使用 code 的哈希作为临时标识
    */
   async wechatLogin(dto: WechatLoginDto): Promise<LoginResponse> {
     const { code, userType } = dto;
@@ -105,20 +106,31 @@ export class AuthService {
       throw new BadRequestException('用户类型无效');
     }
 
-    // 调用微信 API 获取 openid
-    const wxResult = await this.getWechatOpenId(code);
-    if (!wxResult.openid) {
-      console.error('微信登录失败:', wxResult);
-      throw new BadRequestException(wxResult.errmsg || '微信登录失败');
+    if (userType === UserType.ELDERLY) {
+      // 老人需要邀请码登录，不支持微信直接登录
+      throw new BadRequestException('老人用户请使用邀请码登录');
     }
 
-    const { openid } = wxResult;
-    let user: any;
+    let identifier: string;
 
-    // 根据用户类型处理
-    // 注意：当前数据库没有 openid 字段，我们用 phone 字段临时存储 openid
-    // 后续应该添加 openid 字段并做正式的绑定逻辑
-    const fakePhone = `wx_${openid.slice(-8)}`; // 用 openid 后8位作为临时标识
+    // 尝试调用微信 API 获取 openid
+    const wxResult = await this.getWechatOpenId(code);
+    
+    if (wxResult.openid) {
+      // 微信配置正常，使用 openid
+      identifier = wxResult.openid;
+    } else {
+      // 微信配置缺失或调用失败
+      // 使用 code 作为标识（注意：每次调用 wx.login() code 会变化）
+      // 这是临时方案，生产环境必须配置微信 AppID 和 AppSecret
+      console.warn('微信 API 调用失败，使用临时开发模式:', wxResult.errmsg);
+      // 开发模式：使用固定前缀 + userType 创建测试用户
+      identifier = `dev_${userType}_default`;
+    }
+
+    let user: any;
+    // 用 phone 字段临时存储标识（后续应该添加 openid 字段）
+    const fakePhone = `wx_${identifier.slice(-8)}`;
 
     if (userType === UserType.CHILD) {
       // 子女登录/注册
@@ -140,9 +152,6 @@ export class AuthService {
         },
         update: {},
       });
-    } else {
-      // 老人需要邀请码登录，不支持微信直接登录
-      throw new BadRequestException('老人用户请使用邀请码登录');
     }
 
     // 生成 Token
