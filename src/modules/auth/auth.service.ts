@@ -94,28 +94,59 @@ export class AuthService {
   }
 
   /**
-   * 微信登录
+   * 微信登录（静默登录）
+   * 
+   * 根据微信 openid 自动创建或查找用户，实现无感登录
    */
   async wechatLogin(dto: WechatLoginDto): Promise<LoginResponse> {
     const { code, userType } = dto;
 
+    if (!userType || !['child', 'angel', 'elderly'].includes(userType)) {
+      throw new BadRequestException('用户类型无效');
+    }
+
     // 调用微信 API 获取 openid
     const wxResult = await this.getWechatOpenId(code);
     if (!wxResult.openid) {
-      throw new BadRequestException('微信登录失败');
+      console.error('微信登录失败:', wxResult);
+      throw new BadRequestException(wxResult.errmsg || '微信登录失败');
     }
 
-    const { openid, unionid, session_key } = wxResult;
+    const { openid } = wxResult;
+    let user: any;
 
-    // TODO: 根据 openid 查询或创建用户
-    // 需要存储 openid 和 unionid 的关联
+    // 根据用户类型处理
+    // 注意：当前数据库没有 openid 字段，我们用 phone 字段临时存储 openid
+    // 后续应该添加 openid 字段并做正式的绑定逻辑
+    const fakePhone = `wx_${openid.slice(-8)}`; // 用 openid 后8位作为临时标识
 
-    // 临时返回（需要完善微信用户绑定逻辑）
-    return {
-      success: true,
-      message: '微信登录成功，请绑定手机号',
-      data: undefined,
-    };
+    if (userType === UserType.CHILD) {
+      // 子女登录/注册
+      user = await this.prisma.user.upsert({
+        where: { phone: fakePhone },
+        create: { 
+          phone: fakePhone, 
+          name: '微信用户',
+        },
+        update: {},
+      });
+    } else if (userType === UserType.ANGEL) {
+      // 天使登录/注册
+      user = await this.prisma.angel.upsert({
+        where: { phone: fakePhone },
+        create: { 
+          phone: fakePhone, 
+          name: '新天使',
+        },
+        update: {},
+      });
+    } else {
+      // 老人需要邀请码登录，不支持微信直接登录
+      throw new BadRequestException('老人用户请使用邀请码登录');
+    }
+
+    // 生成 Token
+    return this.generateTokenResponse(user, userType);
   }
 
   /**
