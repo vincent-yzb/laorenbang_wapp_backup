@@ -4,8 +4,8 @@
   "description": "老人帮后端 API 服务",
   "main": "dist/main.js",
   "scripts": {
-    "postinstall": "prisma generate",
-    "build": "prisma generate && nest build",
+    "postinstall": "npx prisma generate || true",
+    "build": "npx prisma generate && npx tsc -p tsconfig.build.json",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
