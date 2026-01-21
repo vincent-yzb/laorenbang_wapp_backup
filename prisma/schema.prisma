@@ -6,8 +6,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // 使用占位符，运行时会被 PrismaService 覆盖
-  url      = "postgresql://placeholder:placeholder@localhost:5432/placeholder"
+  url      = env("DATABASE_URL")
 }
 
 // ============ 用户相关 ============

@@ -1,10 +1,3 @@
-// 在最开始打印环境变量状态
-console.log('========== Environment Check ==========');
-console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
-console.log('DATABASE_URL value:', process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NOT SET');
-console.log('All env keys:', Object.keys(process.env).sort().join(', '));
-console.log('========================================');
-
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
