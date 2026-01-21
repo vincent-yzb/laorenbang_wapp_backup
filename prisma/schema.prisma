@@ -1,0 +1,211 @@
+// Prisma Schema - 老人帮数据库模型
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 用户相关 ============
+
+// 用户表（子女）
+model User {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  name        String?
+  avatar      String?
+  idCard      String?  // 身份证号（加密存储）
+  isVerified  Boolean  @default(false) // 是否实名认证
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联
+  elderly     Elderly[]
+  orders      Order[]
+  
+  @@map("users")
+}
+
+// 老人表
+model Elderly {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  avatar      String?
+  idCard      String?  // 身份证号（加密存储）
+  relation    String   // 与子女关系：父亲、母亲、爷爷、奶奶等
+  address     String
+  lat         Float?   // 纬度
+  lng         Float?   // 经度
+  inviteCode  String   @unique // 登录邀请码
+  healthNote  String?  // 健康状况备注
+  angelNote   String?  // 给天使的注意事项
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  orders      Order[]
+  
+  @@map("elderly")
+}
+
+// 天使表（服务提供者）
+model Angel {
+  id              String   @id @default(cuid())
+  phone           String   @unique
+  name            String
+  avatar          String?
+  idCard          String?  // 身份证号（加密存储）
+  idCardFront     String?  // 身份证正面照
+  idCardBack      String?  // 身份证背面照
+  isVerified      Boolean  @default(false) // 是否通过审核
+  status          AngelStatus @default(PENDING) // 审核状态
+  rating          Float    @default(5.0) // 评分
+  completedOrders Int      @default(0)   // 完成订单数
+  balance         Float    @default(0)   // 账户余额
+  lat             Float?   // 当前纬度
+  lng             Float?   // 当前经度
+  isOnline        Boolean  @default(false) // 是否在线接单
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // 关联
+  orders          Order[]
+  incomeRecords   IncomeRecord[]
+  
+  @@map("angels")
+}
+
+enum AngelStatus {
+  PENDING   // 待审核
+  APPROVED  // 已通过
+  REJECTED  // 已拒绝
+  SUSPENDED // 已暂停
+}
+
+// ============ 服务相关 ============
+
+// 服务类型表
+model ServiceType {
+  id          String   @id @default(cuid())
+  name        String   // 服务名称
+  icon        String   // 图标
+  description String   // 描述
+  price       Float    // 基础价格
+  unit        String   // 计价单位：次、小时
+  duration    String   // 预计时长
+  category    String   // 分类：生活照料、健康关怀、精神陪伴、紧急服务
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联
+  orders      Order[]
+  
+  @@map("service_types")
+}
+
+// ============ 订单相关 ============
+
+// 订单表
+model Order {
+  id            String      @id @default(cuid())
+  orderNo       String      @unique // 订单号
+  status        OrderStatus @default(PENDING)
+  
+  // 服务信息
+  serviceTypeId String
+  serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id])
+  serviceTime   DateTime    // 预约服务时间
+  address       String      // 服务地址
+  lat           Float?      // 纬度
+  lng           Float?      // 经度
+  remark        String?     // 备注
+  
+  // 费用
+  price         Float       // 订单金额
+  isPaid        Boolean     @default(false)
+  paidAt        DateTime?
+  paymentMethod String?     // 支付方式
+  
+  // 子女信息
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  
+  // 老人信息
+  elderlyId     String
+  elderly       Elderly     @relation(fields: [elderlyId], references: [id])
+  
+  // 天使信息
+  angelId       String?
+  angel         Angel?      @relation(fields: [angelId], references: [id])
+  
+  // 服务进度
+  acceptedAt    DateTime?   // 接单时间
+  arrivedAt     DateTime?   // 到达时间
+  startedAt     DateTime?   // 开始服务时间
+  completedAt   DateTime?   // 完成时间
+  cancelledAt   DateTime?   // 取消时间
+  cancelReason  String?     // 取消原因
+  
+  // 评价
+  rating        Float?      // 评分
+  comment       String?     // 评价内容
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // 关联
+  timelines     OrderTimeline[]
+  
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING         // 待支付
+  PAID            // 已支付，待接单
+  ACCEPTED        // 已接单
+  ON_WAY          // 天使出发中
+  ARRIVED         // 天使已到达
+  IN_PROGRESS     // 服务中
+  PENDING_CONFIRM // 待确认（天使已完成，等子女确认）
+  COMPLETED       // 已完成
+  CANCELLED       // 已取消
+  REFUNDED        // 已退款
+}
+
+// 订单时间线
+model OrderTimeline {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  event     String   // 事件类型
+  content   String   // 事件内容
+  operator  String?  // 操作人
+  createdAt DateTime @default(now())
+  
+  @@map("order_timelines")
+}
+
+// ============ 财务相关 ============
+
+// 天使收入记录
+model IncomeRecord {
+  id          String   @id @default(cuid())
+  angelId     String
+  angel       Angel    @relation(fields: [angelId], references: [id])
+  amount      Float    // 金额
+  type        String   // 类型：订单收入、提现、奖励
+  description String   // 描述
+  orderId     String?  // 关联订单
+  createdAt   DateTime @default(now())
+  
+  @@map("income_records")
+}
+
