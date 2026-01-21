@@ -5,9 +5,9 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  // 使用占位符，运行时会被 PrismaService 覆盖
+  url      = "postgresql://placeholder:placeholder@localhost:5432/placeholder"
 }
 
 // ============ 用户相关 ============
