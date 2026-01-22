@@ -335,15 +335,34 @@ export class OrderService {
 
   /**
    * 开始服务
+   * 允许从 ACCEPTED、ON_WAY、ARRIVED 状态开始服务（灵活处理实际场景）
    */
   async startService(orderId: string, angelId: string) {
-    const order = await this.validateOrderOperation(orderId, angelId, 'ARRIVED');
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+
+    if (order.angelId !== angelId) {
+      throw new ForbiddenException('无权操作该订单');
+    }
+
+    // 允许从多个状态开始服务（实际场景中天使可能直接到达开始服务）
+    const allowedStatuses = ['ACCEPTED', 'ON_WAY', 'ARRIVED'];
+    if (!allowedStatuses.includes(order.status)) {
+      throw new BadRequestException(`当前订单状态(${order.status})不允许开始服务`);
+    }
 
     await this.prisma.order.update({
       where: { id: orderId },
       data: {
         status: 'IN_PROGRESS',
         startedAt: new Date(),
+        // 如果还没有到达时间，设置为现在
+        arrivedAt: order.arrivedAt || new Date(),
       },
     });
 
