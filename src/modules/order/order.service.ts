@@ -174,12 +174,21 @@ export class OrderService {
     const latRange = radius / 111; // 约111km/度
     const lngRange = radius / (111 * Math.cos((lat * Math.PI) / 180));
 
+    // 服务后付款模式：订单创建时状态为 PENDING，也要展示给天使
     const orders = await this.prisma.order.findMany({
       where: {
-        status: 'PAID', // 只显示已支付待接单的订单
+        status: { in: ['PENDING', 'PAID'] }, // 待接单的订单（服务后付款模式下是PENDING）
         angelId: null,
-        lat: { gte: lat - latRange, lte: lat + latRange },
-        lng: { gte: lng - lngRange, lte: lng + lngRange },
+        // 如果订单有经纬度，则按距离筛选；如果没有，也显示出来让天使看到
+        OR: [
+          {
+            lat: { gte: lat - latRange, lte: lat + latRange },
+            lng: { gte: lng - lngRange, lte: lng + lngRange },
+          },
+          {
+            lat: null,
+          },
+        ],
       },
       include: {
         serviceType: true,
@@ -255,7 +264,8 @@ export class OrderService {
       throw new NotFoundException('订单不存在');
     }
 
-    if (order.status !== 'PAID') {
+    // 服务后付款模式：PENDING 和 PAID 状态都可以接单
+    if (!['PENDING', 'PAID'].includes(order.status)) {
       throw new BadRequestException('订单状态不允许接单');
     }
 
