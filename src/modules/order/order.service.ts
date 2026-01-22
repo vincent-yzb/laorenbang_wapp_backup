@@ -32,45 +32,80 @@ export class OrderService {
    * 创建订单
    */
   async create(userId: string, dto: CreateOrderDto) {
+    console.log('[createOrder] 开始创建订单, userId:', userId);
+    console.log('[createOrder] 请求数据:', JSON.stringify(dto));
+
     // 验证老人是否属于该用户
-    const elderly = await this.prisma.elderly.findFirst({
-      where: { id: dto.elderlyId, userId },
-    });
+    console.log('[createOrder] 查询老人, elderlyId:', dto.elderlyId, 'userId:', userId);
+    let elderly;
+    try {
+      elderly = await this.prisma.elderly.findFirst({
+        where: { id: dto.elderlyId, userId },
+      });
+      console.log('[createOrder] 老人查询结果:', elderly ? elderly.id : 'null');
+    } catch (err: any) {
+      console.error('[createOrder] 老人查询失败:', err.message);
+      throw new BadRequestException(`老人查询失败: ${err.message}`);
+    }
+    
     if (!elderly) {
+      console.error('[createOrder] 老人信息无效');
       throw new BadRequestException('老人信息无效');
     }
 
     // 获取服务类型
-    const serviceType = await this.prisma.serviceType.findUnique({
-      where: { id: dto.serviceTypeId },
-    });
+    console.log('[createOrder] 查询服务类型, serviceTypeId:', dto.serviceTypeId);
+    let serviceType;
+    try {
+      serviceType = await this.prisma.serviceType.findUnique({
+        where: { id: dto.serviceTypeId },
+      });
+      console.log('[createOrder] 服务类型查询结果:', serviceType ? serviceType.name : 'null');
+    } catch (err: any) {
+      console.error('[createOrder] 服务类型查询失败:', err.message);
+      throw new BadRequestException(`服务类型查询失败: ${err.message}`);
+    }
+    
     if (!serviceType) {
+      console.error('[createOrder] 服务类型无效');
       throw new BadRequestException('服务类型无效');
     }
 
     // 创建订单
-    const order = await this.prisma.order.create({
-      data: {
-        orderNo: this.generateOrderNo(),
-        status: 'PENDING',
-        serviceTypeId: dto.serviceTypeId,
-        serviceTime: new Date(dto.serviceTime),
-        address: dto.address,
-        lat: dto.lat,
-        lng: dto.lng,
-        remark: dto.remark,
-        price: serviceType.price,
-        userId,
-        elderlyId: dto.elderlyId,
-      },
-      include: {
-        serviceType: true,
-        elderly: true,
-      },
-    });
+    console.log('[createOrder] 创建订单...');
+    let order;
+    try {
+      order = await this.prisma.order.create({
+        data: {
+          orderNo: this.generateOrderNo(),
+          status: 'PENDING',
+          serviceTypeId: dto.serviceTypeId,
+          serviceTime: new Date(dto.serviceTime),
+          address: dto.address,
+          lat: dto.lat,
+          lng: dto.lng,
+          remark: dto.remark,
+          price: serviceType.price,
+          userId,
+          elderlyId: dto.elderlyId,
+        },
+        include: {
+          serviceType: true,
+          elderly: true,
+        },
+      });
+      console.log('[createOrder] 订单创建成功, orderId:', order.id);
+    } catch (err: any) {
+      console.error('[createOrder] 订单创建失败:', err.message);
+      throw new BadRequestException(`订单创建失败: ${err.message}`);
+    }
 
     // 记录时间线
-    await this.addTimeline(order.id, 'CREATE', '订单创建', '系统');
+    try {
+      await this.addTimeline(order.id, 'CREATE', '订单创建', '系统');
+    } catch (err: any) {
+      console.warn('[createOrder] 时间线记录失败:', err.message);
+    }
 
     return {
       success: true,
