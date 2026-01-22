@@ -66,7 +66,7 @@ model Angel {
   idCardFront     String?  // 身份证正面照
   idCardBack      String?  // 身份证背面照
   isVerified      Boolean  @default(false) // 是否通过审核
-  status          AngelStatus @default(PENDING) // 审核状态
+  status          String   @default("PENDING") // 审核状态: PENDING, APPROVED, REJECTED, SUSPENDED
   rating          Float    @default(5.0) // 评分
   completedOrders Int      @default(0)   // 完成订单数
   balance         Float    @default(0)   // 账户余额
@@ -83,12 +83,7 @@ model Angel {
   @@map("angels")
 }
 
-enum AngelStatus {
-  PENDING   // 待审核
-  APPROVED  // 已通过
-  REJECTED  // 已拒绝
-  SUSPENDED // 已暂停
-}
+// AngelStatus 可选值: PENDING, APPROVED, REJECTED, SUSPENDED
 
 // ============ 服务相关 ============
 
@@ -169,18 +164,7 @@ model Order {
   @@map("orders")
 }
 
-enum OrderStatus {
-  PENDING         // 待支付
-  PAID            // 已支付，待接单
-  ACCEPTED        // 已接单
-  ON_WAY          // 天使出发中
-  ARRIVED         // 天使已到达
-  IN_PROGRESS     // 服务中
-  PENDING_CONFIRM // 待确认（天使已完成，等子女确认）
-  COMPLETED       // 已完成
-  CANCELLED       // 已取消
-  REFUNDED        // 已退款
-}
+// OrderStatus 可选值: PENDING, PAID, ACCEPTED, ON_WAY, ARRIVED, IN_PROGRESS, PENDING_CONFIRM, COMPLETED, CANCELLED, REFUNDED
 
 // 订单时间线
 model OrderTimeline {
