@@ -100,62 +100,86 @@ export class AuthService {
    * 如果微信配置缺失，使用 code 的哈希作为临时标识
    */
   async wechatLogin(dto: WechatLoginDto): Promise<LoginResponse> {
-    const { code, userType } = dto;
+    try {
+      const { code, userType } = dto;
 
-    if (!userType || !['child', 'angel', 'elderly'].includes(userType)) {
-      throw new BadRequestException('用户类型无效');
+      console.log('[wechatLogin] 开始处理, userType:', userType);
+
+      if (!userType || !['child', 'angel', 'elderly'].includes(userType)) {
+        throw new BadRequestException('用户类型无效');
+      }
+
+      if (userType === UserType.ELDERLY) {
+        throw new BadRequestException('老人用户请使用邀请码登录');
+      }
+
+      let identifier: string;
+
+      // 尝试调用微信 API 获取 openid
+      try {
+        const wxResult = await this.getWechatOpenId(code);
+        console.log('[wechatLogin] 微信API返回:', JSON.stringify(wxResult));
+        
+        if (wxResult.openid) {
+          identifier = wxResult.openid;
+        } else {
+          console.warn('[wechatLogin] 微信 API 调用失败，使用临时开发模式:', wxResult.errmsg);
+          identifier = `dev_${userType}_default`;
+        }
+      } catch (wxError) {
+        console.error('[wechatLogin] 调用微信API出错:', wxError);
+        identifier = `dev_${userType}_default`;
+      }
+
+      console.log('[wechatLogin] 使用标识符:', identifier);
+
+      // 用 phone 字段临时存储标识
+      const fakePhone = `wx_${identifier.slice(-8)}`;
+      console.log('[wechatLogin] 临时手机号:', fakePhone);
+
+      let user: any;
+
+      if (userType === UserType.CHILD) {
+        console.log('[wechatLogin] 创建/查找子女用户...');
+        user = await this.prisma.user.upsert({
+          where: { phone: fakePhone },
+          create: { 
+            phone: fakePhone, 
+            name: '微信用户',
+          },
+          update: {},
+        });
+        console.log('[wechatLogin] 子女用户:', user?.id);
+      } else if (userType === UserType.ANGEL) {
+        console.log('[wechatLogin] 创建/查找天使用户...');
+        user = await this.prisma.angel.upsert({
+          where: { phone: fakePhone },
+          create: { 
+            phone: fakePhone, 
+            name: '新天使',
+          },
+          update: {},
+        });
+        console.log('[wechatLogin] 天使用户:', user?.id);
+      }
+
+      if (!user) {
+        throw new BadRequestException('用户创建失败');
+      }
+
+      console.log('[wechatLogin] 生成Token...');
+      const response = this.generateTokenResponse(user, userType);
+      console.log('[wechatLogin] 登录成功, userId:', user.id);
+      
+      return response;
+    } catch (error) {
+      console.error('[wechatLogin] 错误:', error);
+      // 重新抛出 BadRequestException，其他错误包装一下
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException(`微信登录失败: ${error.message || '未知错误'}`);
     }
-
-    if (userType === UserType.ELDERLY) {
-      // 老人需要邀请码登录，不支持微信直接登录
-      throw new BadRequestException('老人用户请使用邀请码登录');
-    }
-
-    let identifier: string;
-
-    // 尝试调用微信 API 获取 openid
-    const wxResult = await this.getWechatOpenId(code);
-    
-    if (wxResult.openid) {
-      // 微信配置正常，使用 openid
-      identifier = wxResult.openid;
-    } else {
-      // 微信配置缺失或调用失败
-      // 使用 code 作为标识（注意：每次调用 wx.login() code 会变化）
-      // 这是临时方案，生产环境必须配置微信 AppID 和 AppSecret
-      console.warn('微信 API 调用失败，使用临时开发模式:', wxResult.errmsg);
-      // 开发模式：使用固定前缀 + userType 创建测试用户
-      identifier = `dev_${userType}_default`;
-    }
-
-    let user: any;
-    // 用 phone 字段临时存储标识（后续应该添加 openid 字段）
-    const fakePhone = `wx_${identifier.slice(-8)}`;
-
-    if (userType === UserType.CHILD) {
-      // 子女登录/注册
-      user = await this.prisma.user.upsert({
-        where: { phone: fakePhone },
-        create: { 
-          phone: fakePhone, 
-          name: '微信用户',
-        },
-        update: {},
-      });
-    } else if (userType === UserType.ANGEL) {
-      // 天使登录/注册
-      user = await this.prisma.angel.upsert({
-        where: { phone: fakePhone },
-        create: { 
-          phone: fakePhone, 
-          name: '新天使',
-        },
-        update: {},
-      });
-    }
-
-    // 生成 Token
-    return this.generateTokenResponse(user, userType);
   }
 
   /**
