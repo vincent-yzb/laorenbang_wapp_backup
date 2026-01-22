@@ -157,8 +157,11 @@ export class AuthService {
           create: { 
             phone: fakePhone, 
             name: '新天使',
+            isOnline: true, // 登录即在线
           },
-          update: {},
+          update: {
+            isOnline: true, // 登录时自动上线
+          },
         });
         console.log('[wechatLogin] 天使用户:', user?.id);
       }
