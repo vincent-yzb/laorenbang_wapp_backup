@@ -68,15 +68,13 @@ export class CreateOrderDto {
  */
 export class QueryOrderDto {
   @IsOptional()
-  @IsEnum(OrderStatus)
+  @IsEnum(OrderStatus, { message: 'status 必须是有效的订单状态' })
   status?: OrderStatus;
 
   @IsOptional()
-  @IsNumber()
   page?: number = 1;
 
   @IsOptional()
-  @IsNumber()
   pageSize?: number = 10;
 }
 
