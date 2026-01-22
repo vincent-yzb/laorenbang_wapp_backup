@@ -32,6 +32,9 @@ export class OrderController {
   @ApiOperation({ summary: '创建订单' })
   @ApiResponse({ status: 201, description: '创建成功' })
   async create(@Request() req, @Body() dto: CreateOrderDto) {
+    console.log('[OrderController] POST /orders 请求到达');
+    console.log('[OrderController] 用户:', req.user?.id, '类型:', req.user?.userType);
+    console.log('[OrderController] 请求体:', JSON.stringify(dto));
     return this.orderService.create(req.user.id, dto);
   }
 
