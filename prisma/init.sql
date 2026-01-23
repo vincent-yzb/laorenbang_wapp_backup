@@ -32,14 +32,8 @@ CREATE TABLE IF NOT EXISTS elderly (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 天使状态枚举
-DO $$ BEGIN
-  CREATE TYPE angel_status AS ENUM ('PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED');
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
-
--- 天使表
+-- 天使表（使用 TEXT 存储状态，避免枚举类型问题）
+-- 状态可选值: PENDING, APPROVED, REJECTED, SUSPENDED
 CREATE TABLE IF NOT EXISTS angels (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   phone TEXT UNIQUE NOT NULL,
@@ -49,7 +43,7 @@ CREATE TABLE IF NOT EXISTS angels (
   id_card_front TEXT,
   id_card_back TEXT,
   is_verified BOOLEAN DEFAULT false,
-  status angel_status DEFAULT 'PENDING',
+  status TEXT DEFAULT 'PENDING',
   rating DOUBLE PRECISION DEFAULT 5.0,
   completed_orders INTEGER DEFAULT 0,
   balance DOUBLE PRECISION DEFAULT 0,
@@ -76,21 +70,12 @@ CREATE TABLE IF NOT EXISTS service_types (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- 订单状态枚举
-DO $$ BEGIN
-  CREATE TYPE order_status AS ENUM (
-    'PENDING', 'PAID', 'ACCEPTED', 'ON_WAY', 'ARRIVED', 
-    'IN_PROGRESS', 'PENDING_CONFIRM', 'COMPLETED', 'CANCELLED', 'REFUNDED'
-  );
-EXCEPTION
-  WHEN duplicate_object THEN null;
-END $$;
-
--- 订单表
+-- 订单表（使用 TEXT 存储状态，避免枚举类型问题）
+-- 状态可选值: PENDING, PAID, ACCEPTED, ON_WAY, ARRIVED, IN_PROGRESS, PENDING_CONFIRM, COMPLETED, CANCELLED, REFUNDED
 CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   order_no TEXT UNIQUE NOT NULL,
-  status order_status DEFAULT 'PENDING',
+  status TEXT DEFAULT 'PENDING',
   service_type_id TEXT NOT NULL REFERENCES service_types(id),
   service_time TIMESTAMP NOT NULL,
   address TEXT NOT NULL,

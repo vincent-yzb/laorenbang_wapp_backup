@@ -19,10 +19,10 @@ model User {
   phone       String   @unique
   name        String?
   avatar      String?
-  idCard      String?  // 身份证号（加密存储）
-  isVerified  Boolean  @default(false) // 是否实名认证
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  idCard      String?  @map("id_card") // 身份证号（加密存储）
+  isVerified  Boolean  @default(false) @map("is_verified") // 是否实名认证
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
   
   // 关联
   elderly     Elderly[]
@@ -37,19 +37,19 @@ model Elderly {
   name        String
   phone       String
   avatar      String?
-  idCard      String?  // 身份证号（加密存储）
+  idCard      String?  @map("id_card") // 身份证号（加密存储）
   relation    String   // 与子女关系：父亲、母亲、爷爷、奶奶等
   address     String
   lat         Float?   // 纬度
   lng         Float?   // 经度
-  inviteCode  String   @unique // 登录邀请码
-  healthNote  String?  // 健康状况备注
-  angelNote   String?  // 给天使的注意事项
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  inviteCode  String   @unique @map("invite_code") // 登录邀请码
+  healthNote  String?  @map("health_note") // 健康状况备注
+  angelNote   String?  @map("angel_note") // 给天使的注意事项
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
   
   // 关联
-  userId      String
+  userId      String   @map("user_id")
   user        User     @relation(fields: [userId], references: [id])
   orders      Order[]
   
@@ -62,19 +62,19 @@ model Angel {
   phone           String   @unique
   name            String
   avatar          String?
-  idCard          String?  // 身份证号（加密存储）
-  idCardFront     String?  // 身份证正面照
-  idCardBack      String?  // 身份证背面照
-  isVerified      Boolean  @default(false) // 是否通过审核
+  idCard          String?  @map("id_card") // 身份证号（加密存储）
+  idCardFront     String?  @map("id_card_front") // 身份证正面照
+  idCardBack      String?  @map("id_card_back") // 身份证背面照
+  isVerified      Boolean  @default(false) @map("is_verified") // 是否通过审核
   status          String   @default("PENDING") // 审核状态: PENDING, APPROVED, REJECTED, SUSPENDED
   rating          Float    @default(5.0) // 评分
-  completedOrders Int      @default(0)   // 完成订单数
+  completedOrders Int      @default(0) @map("completed_orders") // 完成订单数
   balance         Float    @default(0)   // 账户余额
   lat             Float?   // 当前纬度
   lng             Float?   // 当前经度
-  isOnline        Boolean  @default(false) // 是否在线接单
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  isOnline        Boolean  @default(false) @map("is_online") // 是否在线接单
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
   
   // 关联
   orders          Order[]
@@ -97,10 +97,10 @@ model ServiceType {
   unit        String   // 计价单位：次、小时
   duration    String   // 预计时长
   category    String   // 分类：生活照料、健康关怀、精神陪伴、紧急服务
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
   
   // 关联
   orders      Order[]
@@ -113,13 +113,13 @@ model ServiceType {
 // 订单表
 model Order {
   id            String      @id @default(cuid())
-  orderNo       String      @unique // 订单号
+  orderNo       String      @unique @map("order_no") // 订单号
   status        String      @default("PENDING") // 使用字符串避免枚举问题
   
   // 服务信息
-  serviceTypeId String
+  serviceTypeId String      @map("service_type_id")
   serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id])
-  serviceTime   DateTime    // 预约服务时间
+  serviceTime   DateTime    @map("service_time") // 预约服务时间
   address       String      // 服务地址
   lat           Float?      // 纬度
   lng           Float?      // 经度
@@ -127,36 +127,36 @@ model Order {
   
   // 费用
   price         Float       // 订单金额
-  isPaid        Boolean     @default(false)
-  paidAt        DateTime?
-  paymentMethod String?     // 支付方式
+  isPaid        Boolean     @default(false) @map("is_paid")
+  paidAt        DateTime?   @map("paid_at")
+  paymentMethod String?     @map("payment_method") // 支付方式
   
   // 子女信息
-  userId        String
+  userId        String      @map("user_id")
   user          User        @relation(fields: [userId], references: [id])
   
   // 老人信息
-  elderlyId     String
+  elderlyId     String      @map("elderly_id")
   elderly       Elderly     @relation(fields: [elderlyId], references: [id])
   
   // 天使信息
-  angelId       String?
+  angelId       String?     @map("angel_id")
   angel         Angel?      @relation(fields: [angelId], references: [id])
   
   // 服务进度
-  acceptedAt    DateTime?   // 接单时间
-  arrivedAt     DateTime?   // 到达时间
-  startedAt     DateTime?   // 开始服务时间
-  completedAt   DateTime?   // 完成时间
-  cancelledAt   DateTime?   // 取消时间
-  cancelReason  String?     // 取消原因
+  acceptedAt    DateTime?   @map("accepted_at") // 接单时间
+  arrivedAt     DateTime?   @map("arrived_at") // 到达时间
+  startedAt     DateTime?   @map("started_at") // 开始服务时间
+  completedAt   DateTime?   @map("completed_at") // 完成时间
+  cancelledAt   DateTime?   @map("cancelled_at") // 取消时间
+  cancelReason  String?     @map("cancel_reason") // 取消原因
   
   // 评价
   rating        Float?      // 评分
   comment       String?     // 评价内容
   
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
   
   // 关联
   timelines     OrderTimeline[]
@@ -169,12 +169,12 @@ model Order {
 // 订单时间线
 model OrderTimeline {
   id        String   @id @default(cuid())
-  orderId   String
+  orderId   String   @map("order_id")
   order     Order    @relation(fields: [orderId], references: [id])
   event     String   // 事件类型
   content   String   // 事件内容
   operator  String?  // 操作人
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
   
   @@map("order_timelines")
 }
@@ -184,13 +184,13 @@ model OrderTimeline {
 // 天使收入记录
 model IncomeRecord {
   id          String   @id @default(cuid())
-  angelId     String
+  angelId     String   @map("angel_id")
   angel       Angel    @relation(fields: [angelId], references: [id])
   amount      Float    // 金额
   type        String   // 类型：订单收入、提现、奖励
   description String   // 描述
-  orderId     String?  // 关联订单
-  createdAt   DateTime @default(now())
+  orderId     String?  @map("order_id") // 关联订单
+  createdAt   DateTime @default(now()) @map("created_at")
   
   @@map("income_records")
 }
