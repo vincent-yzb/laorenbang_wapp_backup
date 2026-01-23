@@ -247,10 +247,7 @@ export class PaymentService {
       throw new NotFoundException('用户不存在');
     }
 
-    // TODO: 实名认证功能完成后启用此检查
-    // if (!angel.isVerified) {
-    //   throw new BadRequestException('请先完成实名认证');
-    // }
+    // MVP阶段：天使端无需预先认证，首次提现成功即视为已认证
 
     if (angel.balance < amount) {
       throw new BadRequestException(`余额不足，当前可提现 ¥${angel.balance.toFixed(2)}`);
@@ -271,10 +268,13 @@ export class PaymentService {
       },
     });
 
-    // 扣减余额
+    // 扣减余额，并标记为已认证（首次提现成功 = 已认证）
     await this.prisma.angel.update({
       where: { id: angelId },
-      data: { balance: { decrement: amount } },
+      data: { 
+        balance: { decrement: amount },
+        isVerified: true, // MVP: 首次提现成功即视为已实名认证
+      },
     });
 
     // 开发环境模拟
