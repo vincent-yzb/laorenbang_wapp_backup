@@ -8,7 +8,9 @@ import {
   Min,
   Max,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 /**
  * 订单状态枚举
@@ -68,8 +70,14 @@ export class CreateOrderDto {
  */
 export class QueryOrderDto {
   @IsOptional()
-  @IsEnum(OrderStatus, { message: 'status 必须是有效的订单状态' })
-  status?: OrderStatus;
+  @Transform(({ value }) => {
+    // 支持逗号分隔的多状态查询，如 "ACCEPTED,ON_WAY,IN_PROGRESS"
+    if (typeof value === 'string' && value.includes(',')) {
+      return value.split(',');
+    }
+    return value;
+  })
+  status?: OrderStatus | OrderStatus[];
 
   @IsOptional()
   page?: number = 1;
