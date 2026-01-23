@@ -247,10 +247,10 @@ export class PaymentService {
       throw new NotFoundException('用户不存在');
     }
 
-    // 开发模式下跳过实名认证检查
-    if (!this.configService.isDevelopment && !angel.isVerified) {
-      throw new BadRequestException('请先完成实名认证');
-    }
+    // TODO: 实名认证功能完成后启用此检查
+    // if (!angel.isVerified) {
+    //   throw new BadRequestException('请先完成实名认证');
+    // }
 
     if (angel.balance < amount) {
       throw new BadRequestException(`余额不足，当前可提现 ¥${angel.balance.toFixed(2)}`);
