@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsNumber, IsEnum, IsOptional, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * 提现方式枚举
@@ -36,11 +37,13 @@ export class RefundDto {
  */
 export class WithdrawDto {
   @IsNotEmpty({ message: '提现金额不能为空' })
-  @IsNumber()
+  @Type(() => Number)
+  @IsNumber({}, { message: '提现金额必须是数字' })
   @Min(10, { message: '提现金额最低10元' })
   amount: number;
 
-  @IsEnum(WithdrawMethod, { message: '提现方式无效' })
+  @IsNotEmpty({ message: '提现方式不能为空' })
+  @IsEnum(WithdrawMethod, { message: '提现方式无效，必须是 wechat/alipay/bank' })
   method: WithdrawMethod;
 
   @IsOptional()

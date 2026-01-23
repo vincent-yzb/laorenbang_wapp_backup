@@ -59,6 +59,11 @@ export class PaymentController {
   @ApiOperation({ summary: '天使提现' })
   @ApiResponse({ status: 200, description: '申请成功' })
   async withdraw(@Request() req, @Body() dto: WithdrawDto) {
+    console.log('[withdraw] 收到提现请求:', JSON.stringify({
+      userId: req.user?.id,
+      userType: req.user?.type,
+      dto,
+    }));
     return this.paymentService.withdraw(req.user.id, dto);
   }
 
