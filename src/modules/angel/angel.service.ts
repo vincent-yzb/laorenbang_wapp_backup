@@ -194,9 +194,14 @@ export class AngelService {
       }
     });
 
-    // 获取今日订单数
+    // 获取今日开始时间
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // 获取本月开始时间
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
 
     const todayOrders = await this.prisma.order.count({
       where: {
@@ -206,11 +211,21 @@ export class AngelService {
     });
 
     // 获取今日收入
-    const todayIncome = await this.prisma.incomeRecord.aggregate({
+    const todayIncomeResult = await this.prisma.incomeRecord.aggregate({
       where: {
         angelId,
         type: '订单收入',
         createdAt: { gte: today },
+      },
+      _sum: { amount: true },
+    });
+
+    // 获取本月收入
+    const monthIncomeResult = await this.prisma.incomeRecord.aggregate({
+      where: {
+        angelId,
+        type: '订单收入',
+        createdAt: { gte: startOfMonth },
       },
       _sum: { amount: true },
     });
@@ -220,7 +235,11 @@ export class AngelService {
       data: {
         ...result,
         todayOrders,
-        todayIncome: todayIncome._sum.amount || 0,
+        // 同时返回两种命名，兼容前端
+        todayIncome: todayIncomeResult._sum.amount || 0,
+        todayEarnings: todayIncomeResult._sum.amount || 0,
+        monthIncome: monthIncomeResult._sum.amount || 0,
+        monthEarnings: monthIncomeResult._sum.amount || 0,
       },
     };
   }

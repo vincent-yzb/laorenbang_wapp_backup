@@ -101,7 +101,7 @@ export class AuthService {
    */
   async wechatLogin(dto: WechatLoginDto): Promise<LoginResponse> {
     try {
-      const { code, userType } = dto;
+    const { code, userType } = dto;
 
       console.log('[wechatLogin] 开始处理, userType:', userType);
 
@@ -117,7 +117,7 @@ export class AuthService {
 
       // 尝试调用微信 API 获取 openid
       try {
-        const wxResult = await this.getWechatOpenId(code);
+    const wxResult = await this.getWechatOpenId(code);
         console.log('[wechatLogin] 微信API返回:', JSON.stringify(wxResult));
         
         if (wxResult.openid) {

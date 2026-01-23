@@ -40,8 +40,8 @@ export class OrderService {
     let elderly;
     try {
       elderly = await this.prisma.elderly.findFirst({
-        where: { id: dto.elderlyId, userId },
-      });
+      where: { id: dto.elderlyId, userId },
+    });
       console.log('[createOrder] 老人查询结果:', elderly ? elderly.id : 'null');
     } catch (err: any) {
       console.error('[createOrder] 老人查询失败:', err.message);
@@ -58,8 +58,8 @@ export class OrderService {
     let serviceType;
     try {
       serviceType = await this.prisma.serviceType.findUnique({
-        where: { id: dto.serviceTypeId },
-      });
+      where: { id: dto.serviceTypeId },
+    });
       console.log('[createOrder] 服务类型查询结果:', serviceType ? serviceType.name : 'null');
     } catch (err: any) {
       console.error('[createOrder] 服务类型查询失败:', err.message);
@@ -76,24 +76,24 @@ export class OrderService {
     let order;
     try {
       order = await this.prisma.order.create({
-        data: {
-          orderNo: this.generateOrderNo(),
-          status: 'PENDING',
-          serviceTypeId: dto.serviceTypeId,
-          serviceTime: new Date(dto.serviceTime),
-          address: dto.address,
-          lat: dto.lat,
-          lng: dto.lng,
-          remark: dto.remark,
-          price: serviceType.price,
-          userId,
-          elderlyId: dto.elderlyId,
-        },
-        include: {
-          serviceType: true,
-          elderly: true,
-        },
-      });
+      data: {
+        orderNo: this.generateOrderNo(),
+        status: 'PENDING',
+        serviceTypeId: dto.serviceTypeId,
+        serviceTime: new Date(dto.serviceTime),
+        address: dto.address,
+        lat: dto.lat,
+        lng: dto.lng,
+        remark: dto.remark,
+        price: serviceType.price,
+        userId,
+        elderlyId: dto.elderlyId,
+      },
+      include: {
+        serviceType: true,
+        elderly: true,
+      },
+    });
       console.log('[createOrder] 订单创建成功, orderId:', order.id);
     } catch (err: any) {
       console.error('[createOrder] 订单创建失败:', err.message);
@@ -102,7 +102,7 @@ export class OrderService {
 
     // 记录时间线
     try {
-      await this.addTimeline(order.id, 'CREATE', '订单创建', '系统');
+    await this.addTimeline(order.id, 'CREATE', '订单创建', '系统');
     } catch (err: any) {
       console.warn('[createOrder] 时间线记录失败:', err.message);
     }
@@ -182,8 +182,8 @@ export class OrderService {
         // 如果订单有经纬度，则按距离筛选；如果没有，也显示出来让天使看到
         OR: [
           {
-            lat: { gte: lat - latRange, lte: lat + latRange },
-            lng: { gte: lng - lngRange, lte: lng + lngRange },
+        lat: { gte: lat - latRange, lte: lat + latRange },
+        lng: { gte: lng - lngRange, lte: lng + lngRange },
           },
           {
             lat: null,
