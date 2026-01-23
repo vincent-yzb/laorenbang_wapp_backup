@@ -131,13 +131,8 @@ export class OrderService {
       where.elderlyId = userId;
     }
 
-    // 支持单状态或多状态查询
     if (status) {
-      if (Array.isArray(status)) {
-        where.status = { in: status };
-      } else {
-        where.status = status;
-      }
+      where.status = status;
     }
 
     const [orders, total] = await Promise.all([
