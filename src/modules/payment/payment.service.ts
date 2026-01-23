@@ -247,7 +247,8 @@ export class PaymentService {
       throw new NotFoundException('用户不存在');
     }
 
-    if (!angel.isVerified) {
+    // 开发模式下跳过实名认证检查
+    if (!this.configService.isDevelopment && !angel.isVerified) {
       throw new BadRequestException('请先完成实名认证');
     }
 
