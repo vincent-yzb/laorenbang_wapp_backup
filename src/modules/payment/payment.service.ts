@@ -19,6 +19,9 @@ export class PaymentService {
 
   /**
    * 创建微信支付订单
+   * 支持两种模式：
+   * 1. 预付款模式：订单状态为 PENDING 时支付
+   * 2. 服务后付款模式：订单状态为 PENDING_CONFIRM 时支付（天使完成服务后）
    */
   async createPayment(userId: string, dto: CreatePaymentDto): Promise<{ success: boolean; data?: MiniProgramPayParams; message?: string }> {
     const { orderId } = dto;
@@ -37,8 +40,9 @@ export class PaymentService {
       throw new BadRequestException('无权操作该订单');
     }
 
-    if (order.status !== 'PENDING') {
-      throw new BadRequestException('订单状态不允许支付');
+    // 允许 PENDING（预付款）或 PENDING_CONFIRM（服务后付款）状态的订单支付
+    if (!['PENDING', 'PENDING_CONFIRM'].includes(order.status)) {
+      throw new BadRequestException(`订单状态不允许支付，当前状态: ${order.status}`);
     }
 
     if (order.isPaid) {
@@ -47,14 +51,19 @@ export class PaymentService {
 
     // 开发环境模拟支付
     if (this.configService.isDevelopment) {
-      // 直接更新订单状态为已支付
+      // 判断是预付款还是服务后付款
+      const isPostServicePayment = order.status === 'PENDING_CONFIRM';
+      const newStatus = isPostServicePayment ? 'COMPLETED' : 'PAID';
+      
+      // 直接更新订单状态
       await this.prisma.order.update({
         where: { id: orderId },
         data: {
-          status: 'PAID',
+          status: newStatus,
           isPaid: true,
           paidAt: new Date(),
           paymentMethod: 'wechat',
+          completedAt: isPostServicePayment ? new Date() : undefined,
         },
       });
 
@@ -63,14 +72,19 @@ export class PaymentService {
         data: {
           orderId,
           event: 'PAID',
-          content: '订单已支付（开发模式）',
+          content: isPostServicePayment ? '订单已支付，服务完成（开发模式）' : '订单已支付（开发模式）',
           operator: '系统',
         },
       });
 
+      // 服务后付款模式：结算天使收入
+      if (isPostServicePayment && order.angelId) {
+        await this.settleAngelIncome(order);
+      }
+
       return {
         success: true,
-        message: '支付成功（开发模式）',
+        message: isPostServicePayment ? '支付成功，订单已完成（开发模式）' : '支付成功（开发模式）',
         data: {
           appId: 'mock_appid',
           timeStamp: Math.floor(Date.now() / 1000).toString(),
@@ -399,5 +413,48 @@ export class PaymentService {
       bank: '银行卡',
     };
     return names[method] || method;
+  }
+
+  /**
+   * 结算天使收入
+   */
+  private async settleAngelIncome(order: any): Promise<void> {
+    if (!order.angelId) {
+      console.log('[settleAngelIncome] 订单没有天使ID，跳过结算');
+      return;
+    }
+
+    // 计算天使收入（这里简化为订单金额的80%，实际可以根据平台规则计算）
+    const platformFeeRate = 0.2; // 平台抽成20%
+    const angelIncome = order.price * (1 - platformFeeRate);
+
+    console.log(`[settleAngelIncome] 订单 ${order.orderNo} 结算天使收入: ¥${angelIncome.toFixed(2)}`);
+
+    try {
+      // 创建收入记录
+      await this.prisma.incomeRecord.create({
+        data: {
+          angelId: order.angelId,
+          amount: angelIncome,
+          type: '订单收入',
+          description: `订单 ${order.orderNo} 服务收入`,
+          orderId: order.id,
+        },
+      });
+
+      // 更新天使余额和完成订单数
+      await this.prisma.angel.update({
+        where: { id: order.angelId },
+        data: {
+          balance: { increment: angelIncome },
+          completedOrders: { increment: 1 },
+        },
+      });
+
+      console.log(`[settleAngelIncome] 天使 ${order.angelId} 余额已增加 ¥${angelIncome.toFixed(2)}`);
+    } catch (error) {
+      console.error('[settleAngelIncome] 结算失败:', error);
+      // 不抛出异常，避免影响支付流程，但需要后续人工处理
+    }
   }
 }
