@@ -191,7 +191,7 @@ export class AuthService {
   async elderlyLogin(dto: ElderlyLoginDto): Promise<LoginResponse> {
     const { inviteCode } = dto;
 
-    // 查询老人信息
+    // 查询老人信息，包含子女（创建者）信息
     const elderly = await this.prisma.elderly.findUnique({
       where: { inviteCode },
       include: { user: true },
@@ -201,9 +201,16 @@ export class AuthService {
       throw new BadRequestException('邀请码无效');
     }
 
-    // 生成 Token
+    // 生成 Token，包含子女信息
     return this.generateTokenResponse(
-      { id: elderly.id, name: elderly.name, phone: elderly.phone },
+      { 
+        id: elderly.id, 
+        name: elderly.name, 
+        phone: elderly.phone,
+        // 子女信息
+        childName: elderly.user?.name || '我的家人',
+        childPhone: elderly.user?.phone,
+      },
       UserType.ELDERLY,
     );
   }
@@ -279,6 +286,9 @@ export class AuthService {
           avatar: user.avatar,
           isVerified: user.isVerified ?? false,
           userType,
+          // 老人端专用：子女信息
+          childName: user.childName,
+          childPhone: user.childPhone,
         },
       },
     };
