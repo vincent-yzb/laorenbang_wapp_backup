@@ -106,6 +106,9 @@ export interface LoginResponse {
       avatar?: string;
       isVerified: boolean;
       userType: UserType;
+      // 老人端专用：子女信息
+      childName?: string;
+      childPhone?: string;
     };
   };
   message?: string;
