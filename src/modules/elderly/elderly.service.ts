@@ -7,11 +7,11 @@ export class ElderlyService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * 生成6位邀请码
+   * 生成8位邀请码
    */
   private generateInviteCode(): string {
-    // 3字节 = 6位十六进制字符
-    return crypto.randomBytes(3).toString('hex').toUpperCase();
+    // 4字节 = 8位十六进制字符
+    return crypto.randomBytes(4).toString('hex').toUpperCase();
   }
 
   /**
