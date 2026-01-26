@@ -203,10 +203,12 @@ export class AngelService {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
+    // 今日完成的订单数（而不是今日创建的）
     const todayOrders = await this.prisma.order.count({
       where: {
         angelId,
-        createdAt: { gte: today },
+        status: 'COMPLETED',
+        completedAt: { gte: today },
       },
     });
 

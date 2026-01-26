@@ -68,8 +68,8 @@ export class CreateOrderDto {
  */
 export class QueryOrderDto {
   @IsOptional()
-  @IsString()
-  status?: string; // 支持单个状态或逗号分隔的多个状态，如 "ACCEPTED,ON_WAY,IN_PROGRESS"
+  @IsEnum(OrderStatus, { message: 'status 必须是有效的订单状态' })
+  status?: OrderStatus;
 
   @IsOptional()
   page?: number = 1;

@@ -115,7 +115,6 @@ export class OrderService {
 
   /**
    * 获取订单列表
-   * 支持单个状态或逗号分隔的多个状态查询
    */
   async list(userId: string, userType: string, query: QueryOrderDto) {
     const { status, page = 1, pageSize = 10 } = query;
@@ -132,14 +131,8 @@ export class OrderService {
       where.elderlyId = userId;
     }
 
-    // 支持多状态查询（逗号分隔）
     if (status) {
-      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
-      if (statuses.length === 1) {
-        where.status = statuses[0];
-      } else if (statuses.length > 1) {
-        where.status = { in: statuses };
-      }
+      where.status = status;
     }
 
     const [orders, total] = await Promise.all([
