@@ -32,8 +32,10 @@ export class PaymentService implements OnModuleInit, OnModuleDestroy {
       return this.createMockPayment(userId, dto);
     }
     this.requireConfigured(); // Disabled gateways must make no database writes or provider calls.
-    const payer = await this.prisma.user.findUnique({ where: { id: userId }, select: { wechatOpenId: true } });
-    if (!payer?.wechatOpenId) throw new BadRequestException('请使用微信登录后付款');
+    const payer = await this.prisma.user.findUnique({ where: { id: userId }, select: { wechatOpenId: true, wechatAppId: true } });
+    if (!payer?.wechatOpenId || !process.env.WECHAT_APPID || payer.wechatAppId !== process.env.WECHAT_APPID) {
+      throw new BadRequestException('请使用当前小程序微信登录后付款');
+    }
     let reserved: { attempt?: PaymentAttempt; created?: boolean; paid?: boolean };
     try {
       reserved = await this.prisma.$transaction(async tx => {

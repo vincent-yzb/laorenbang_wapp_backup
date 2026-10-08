@@ -91,8 +91,18 @@ export interface JwtPayload {
   sub: string;        // 用户ID
   phone?: string;     // 手机号
   userType: UserType; // 用户类型
+  appId?: string;     // 签发时的小程序；配置 AppID 的环境不接受历史无归属 Token
   iat?: number;       // 签发时间
   exp?: number;       // 过期时间
+}
+
+/** Missing AppID is allowed only by explicit offline/local test environments. */
+export function jwtAppScopeMatches(payload: Pick<JwtPayload, 'appId'>, currentAppId: string): boolean {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+  if (currentAppId) return payload.appId === currentAppId;
+  const isolated = process.env.NODE_ENV === 'test' || (process.env.NODE_ENV === 'development' &&
+    (process.env.LRB_INTEGRATION_DB === 'true' || process.env.LRB_ISOLATED_ENV === 'true'));
+  return isolated && payload.appId === undefined;
 }
 
 /**

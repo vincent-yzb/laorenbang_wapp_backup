@@ -95,6 +95,7 @@ test('真实增量保留旧行和Float，仅回填整数分与隔离历史余额
   const name = await oldSchema('valid');
   psql(name, legacyRows);
   psql(name, migration);
+  psql(name, readFileSync(resolve(root, 'prisma/migrations/20261008_wechat_app_scope/migration.sql'), 'utf8'));
   const db = clientFor(name);
   const angel = await db.angel.findUniqueOrThrow({ where: { id: 'angel' } });
   assert.equal(angel.balance, 12.34);
@@ -140,6 +141,7 @@ test('真实唯一键与余额约束防重复账目，并发冻结仅一个成�
   const name = await oldSchema('constraints');
   psql(name, legacyRows);
   psql(name, migration);
+  psql(name, readFileSync(resolve(root, 'prisma/migrations/20261008_wechat_app_scope/migration.sql'), 'utf8'));
   const db = clientFor(name);
   const attempt = { id: 'attempt', orderId: 'order', userId: 'child', mode: 'WECHAT', outTradeNo: 'synthetictrade',
     activeOrderId: 'order', amountCents: 12345n, angelAmountCents: 9876n, platformAmountCents: 2469n,

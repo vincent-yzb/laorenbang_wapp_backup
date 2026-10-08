@@ -46,7 +46,8 @@ before(async () => {
   assert.equal(identity.db, 'lrb_integration'); assert.equal(identity.role, 'lrb_integration'); verified = true;
   await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`); owned = true;
   const migrations = readdirSync(resolve(root, 'prisma/migrations')).filter(name => /^\d{8}_/.test(name)).sort();
-  assert.deepEqual(migrations, ['20260120_baseline', '20261008_payment_ledger', '20261008_payment_review_audit', '20261008_wechat_identity']);
+  assert.deepEqual(migrations, ['20260120_baseline', '20261008_payment_ledger', '20261008_payment_review_audit',
+    '20261008_wechat_app_scope', '20261008_wechat_identity']);
   const sql = migrations.map(name => readFileSync(resolve(root, 'prisma/migrations', name, 'migration.sql'), 'utf8')).join('\n');
   const applied = spawnSync(docker[0], [...docker.slice(1), 'exec', '--interactive', 'lrb-integration-20261008', 'psql', '-U', 'lrb_integration', '-d', 'lrb_integration', '--quiet', '--set', 'ON_ERROR_STOP=1', '--command', `SET search_path TO "${schema}"`, '--file', '-'], { input: sql, encoding: 'utf8' });
   assert.equal(applied.status, 0, 'Fresh sorted migration application failed; raw database details withheld');
@@ -63,8 +64,8 @@ after(async () => {
 async function fixture(options: { balance?: bigint; nonWithdrawable?: bigint; origin?: string } = {}) {
   const key = `synthetic_${++counter}`;
   const balance = options.balance ?? 8000n;
-  const child = await db.user.create({ data: { phone: `${key}_child`, wechatOpenId: `${key}_child_openid` } });
-  const angel = await db.angel.create({ data: { phone: `${key}_angel`, wechatOpenId: `${key}_angel_openid`, name: 'synthetic',
+  const child = await db.user.create({ data: { phone: `${key}_child`, wechatOpenId: `${key}_child_openid`, wechatAppId: process.env.WECHAT_APPID } });
+  const angel = await db.angel.create({ data: { phone: `${key}_angel`, wechatOpenId: `${key}_angel_openid`, wechatAppId: process.env.WECHAT_APPID, name: 'synthetic',
     status: 'APPROVED', isVerified: true, balance: Number(balance) / 100, balanceCents: balance,
     nonWithdrawableBalanceCents: options.nonWithdrawable ?? 0n } });
   const service = await db.serviceType.create({ data: { name: 'synthetic', icon: 'test', description: 'synthetic', price: 100,
@@ -171,6 +172,22 @@ test('提现请求幂等键防超时重复且拒绝改金额，审批前不扣�
   assert.equal(a.data.id, b.data.id); assert.equal(a.data.status, 'REQUESTED');
   await assert.rejects(withdrawalRequest(s, f, 'same_key', 10));
   assert.equal((await wallet(f)).balanceCents, 8000n); assert.equal((await wallet(f)).frozenBalanceCents, 0n); assert.equal(p.transferCalls, 0);
+});
+
+test('真实PG旧/null天使AppID在申请/审批前拒绝，没有申请或冻结及商户请求', async () => {
+  for (const wechatAppId of [null, 'synthetic-old-app']) {
+    const f = await fixture(); const p = new Provider(f); const s = serviceFor(p);
+    await db.angel.update({ where: { id: f.angel.id }, data: { wechatAppId } });
+    await assert.rejects(withdrawalRequest(s, f, `old_scope_${counter}`), { status: 400 });
+    assert.equal(await db.withdrawal.count({ where: { angelId: f.angel.id } }), 0);
+    await db.angel.update({ where: { id: f.angel.id }, data: { wechatAppId: process.env.WECHAT_APPID } });
+    const request = await withdrawalRequest(s, f, `before_scope_change_${counter}`);
+    await db.angel.update({ where: { id: f.angel.id }, data: { wechatAppId } });
+    await assert.rejects(s.approveWithdrawal(request.data.id, 'synthetic-operator'), { status: 400 });
+    assert.equal((await wallet(f)).frozenBalanceCents, 0n); assert.equal((await wallet(f)).balanceCents, 8000n);
+    assert.equal((await db.withdrawal.findUniqueOrThrow({ where: { id: request.data.id } })).status, 'REQUESTED');
+    assert.equal(p.transferCalls, 0);
+  }
 });
 
 test('真实PG两笔提现并发审批只有一笔能占用同一余额', async () => {

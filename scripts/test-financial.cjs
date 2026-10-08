@@ -16,7 +16,8 @@ try {
   guard(url.protocol === 'postgresql:' && url.hostname === '127.0.0.1' && url.port === '55432' &&
     url.pathname === '/lrb_integration' && url.username === 'lrb_integration' && !!url.password);
   const files = ['test/integration/postgres.test.ts', 'test/integration/payment-ledger-migration.test.ts',
-    'test/integration/real-payment.test.ts', 'test/integration/funds-ledger.test.ts'];
+    'test/integration/real-payment.test.ts', 'test/integration/funds-ledger.test.ts',
+    'test/integration/wechat-app-scope-http.test.ts'];
   guard(files.every(file => fs.existsSync(path.join(root, file))));
   const result = spawnSync(process.execPath, ['--require', 'ts-node/register/transpile-only', '--test', ...files], {
     cwd: root, env: { ...process.env, ...values, LRB_INTEGRATION_DB: 'true', NODE_ENV: 'development',

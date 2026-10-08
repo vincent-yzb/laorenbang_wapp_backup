@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { createHash } from 'crypto';
@@ -13,6 +13,7 @@ import {
   UserType,
   JwtPayload,
   LoginResponse,
+  jwtAppScopeMatches,
 } from './dto/auth.dto';
 
 @Injectable()
@@ -39,6 +40,7 @@ export class AuthService {
     if (userType === UserType.ELDERLY) {
       throw new BadRequestException('老人用户请使用邀请码登录');
     }
+    this.requireTokenAppScope();
     await this.identityService.consumePhoneCode(phone, code);
 
     // 根据用户类型处理登录
@@ -66,25 +68,31 @@ export class AuthService {
     return this.generateTokenResponse(user, userType);
   }
 
-  /** 微信身份只通过完整 openid 匹配；上游失败时不创建账号。 */
+  /** Keep global openid uniqueness, but never claim a legacy or another AppID's identity. */
   async wechatLogin(input: WechatLoginDto): Promise<LoginResponse> {
     const { code, userType } = validateInput(WechatLoginDto, input);
     if (userType === UserType.ELDERLY) {
       throw new BadRequestException('老人用户请使用邀请码登录');
     }
+    const wechatAppId = this.configService.wechatAppId;
+    if (!wechatAppId) throw new ServiceUnavailableException('微信服务尚未配置');
     const wechatOpenId = await this.identityService.getWechatOpenId(code);
-    const phone = `wx_${createHash('sha256').update(wechatOpenId).digest('hex')}`;
+    if (this.configService.wechatAppId !== wechatAppId) throw new ServiceUnavailableException('微信配置已变化，请重新登录');
+    const phone = `wx_${createHash('sha256').update(JSON.stringify([wechatAppId, wechatOpenId])).digest('hex')}`;
     const user = userType === UserType.CHILD
       ? await this.prisma.user.upsert({
           where: { wechatOpenId },
-          create: { wechatOpenId, phone, name: '微信用户' },
+          create: { wechatOpenId, wechatAppId, phone, name: '微信用户' },
           update: {},
         })
       : await this.prisma.angel.upsert({
           where: { wechatOpenId },
-          create: { wechatOpenId, phone, name: '新天使' },
+          create: { wechatOpenId, wechatAppId, phone, name: '新天使' },
           update: {},
         });
+    if (user.wechatAppId !== wechatAppId || this.configService.wechatAppId !== wechatAppId) {
+      throw new UnauthorizedException('微信身份不属于当前小程序，请重新登录或联系支持');
+    }
     return this.generateTokenResponse(user, userType);
   }
 
@@ -93,6 +101,7 @@ export class AuthService {
    */
   async elderlyLogin(dto: ElderlyLoginDto): Promise<LoginResponse> {
     const { inviteCode } = validateInput(ElderlyLoginDto, dto);
+    this.requireTokenAppScope();
 
     // 查询老人信息，包含子女（创建者）信息
     let elderly = await this.prisma.elderly.findUnique({
@@ -135,6 +144,7 @@ export class AuthService {
       const payload = this.jwtService.verify<JwtPayload>(refreshToken, {
         secret: this.configService.jwtSecret + '_refresh',
       });
+      if (!jwtAppScopeMatches(payload, this.configService.wechatAppId)) throw new UnauthorizedException('Token 小程序归属无效');
 
       // 查询用户
       let user: any;
@@ -161,13 +171,22 @@ export class AuthService {
    */
   async validateToken(token: string): Promise<JwtPayload | null> {
     try {
-      return this.jwtService.verify<JwtPayload>(token);
+      const payload = this.jwtService.verify<JwtPayload>(token);
+      return jwtAppScopeMatches(payload, this.configService.wechatAppId) ? payload : null;
     } catch {
       return null;
     }
   }
 
   // ============ 私有方法 ============
+
+  private requireTokenAppScope(): string | undefined {
+    const appId = this.configService.wechatAppId || undefined;
+    if (!jwtAppScopeMatches({ appId }, appId ?? '')) {
+      throw new ServiceUnavailableException('小程序身份配置尚未就绪');
+    }
+    return appId;
+  }
 
   /**
    * 生成 Token 响应
@@ -177,6 +196,7 @@ export class AuthService {
       sub: user.id,
       phone: user.phone,
       userType,
+      appId: this.requireTokenAppScope(),
     };
 
     const token = this.jwtService.sign(payload);

@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '../../config/config.service';
-import { JwtPayload, UserType } from './dto/auth.dto';
+import { JwtPayload, UserType, jwtAppScopeMatches } from './dto/auth.dto';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -22,6 +22,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * 验证 JWT Payload，返回用户信息
    */
   async validate(payload: JwtPayload) {
+    if (!jwtAppScopeMatches(payload, this.configService.wechatAppId)) {
+      throw new UnauthorizedException('Token 小程序归属无效，请重新登录');
+    }
     const { sub, userType } = payload;
 
     let user: any;
@@ -47,6 +50,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       phone: user.phone,
       name: user.name,
       userType,
+      appId: payload.appId,
     };
   }
 }

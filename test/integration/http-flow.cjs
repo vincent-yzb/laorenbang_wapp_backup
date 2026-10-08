@@ -13,7 +13,8 @@ const elderlyIds = [], orderIds = [];
 let checks = 0;
 
 async function request(path, { method = 'GET', body, role, expected = 200 } = {}) {
-  const token = role && jwt.sign({ sub: ids[role], userType: role === 'outsider' ? 'child' : role }, { expiresIn: '10m' });
+  const token = role && jwt.sign({ sub: ids[role], userType: role === 'outsider' ? 'child' : role,
+    appId: environment.WECHAT_APPID || undefined }, { expiresIn: '10m' });
   const response = await fetch(`http://127.0.0.1:3101/api${path}`, {
     method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000),

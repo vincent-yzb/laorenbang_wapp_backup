@@ -73,7 +73,7 @@ async function fixture() {
   const base = `${prefix}${++sequence}-`;
   const userId = base + 'child'; owned.users.push(userId);
   const payer = base + 'synthetic-payer';
-  const user = await prisma.user.create({ data: { id: userId, phone: base + 'phone-child', wechatOpenId: payer, name: '隔离虚构付款人' } });
+  const user = await prisma.user.create({ data: { id: userId, phone: base + 'phone-child', wechatOpenId: payer, wechatAppId: appId, name: '隔离虚构付款人' } });
   const angelId = base + 'angel'; owned.angels.push(angelId);
   const angel = await prisma.angel.create({ data: { id: angelId, phone: base + 'phone-angel', name: '隔离虚构服务者',
     isVerified: true, status: 'APPROVED', balance: 12.34, balanceCents: 1234n, openingBalanceCents: 1234n, nonWithdrawableBalanceCents: 1234n } });
@@ -134,6 +134,17 @@ test('真实PG八路创建只有一个商户下单与active attempt，预付响�
   assert.equal((await f.snapshot()).incomes.length, 0);
   assert.equal((await f.payment.createPayment(f.user.id, { orderId: f.order.id })).data?.package, 'prepay_id=synthetic');
   assert.equal(f.counts().createCalls, 1);
+});
+
+test('真实PG旧/null AppID payer 不能创建付款单，新 AppID 不能复用旧付款身份', async () => {
+  const f = await fixture();
+  for (const wechatAppId of [null, 'wxfedcba9876543210']) {
+    await prisma.user.update({ where: { id: f.user.id }, data: { wechatAppId } });
+    await assert.rejects(f.payment.createPayment(f.user.id, { orderId: f.order.id }), BadRequestException);
+    assert.equal(await prisma.paymentAttempt.count({ where: { orderId: f.order.id } }), 0);
+    assert.deepEqual(f.counts(), { createCalls: 0, queryCalls: 0 });
+    assert.equal((await f.snapshot()).order.isPaid, false);
+  }
 });
 
 test('真实PG重复/并发通知与query只结算一次，旧余额保持不可提现', async () => {

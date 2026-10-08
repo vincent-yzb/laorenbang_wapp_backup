@@ -70,6 +70,7 @@ test('微信身份稳定：更换code及绑定手机号后仍返回原账号', a
   assert.equal(second.data!.user.phone, '13800138001');
   assert.equal(f.rows.user.length, 1);
   assert.equal(f.rows.user[0].wechatOpenId, 'openid-original-12345678');
+  assert.equal(f.rows.user[0].wechatAppId, f.config.wechatAppId);
   assert.equal(f.writes[0].create.phone.length, 67);
   assert.deepEqual(f.writes[0].where, { wechatOpenId: 'openid-original-12345678' });
 });
@@ -178,7 +179,7 @@ test('微信授权手机号验证上游结果；缺配置不返回共享模拟�
 
 test('用户、天使、老人更新在服务边界拒绝敏感字段及数据库映射字段', async () => {
   const f = fixture();
-  for (const field of ['balance', 'isVerified', 'status', 'userId', 'wechatOpenId', 'phone', 'id', 'createdAt']) {
+  for (const field of ['balance', 'isVerified', 'status', 'userId', 'wechatOpenId', 'wechatAppId', 'phone', 'id', 'createdAt']) {
     await assert.rejects(f.user.updateProfile('user-1', { name: '合法姓名', [field]: 'injected' } as any));
     await assert.rejects(f.angel.updateProfile('angel-1', { name: '合法姓名', [field]: 'injected' } as any));
   }

@@ -412,7 +412,10 @@ export class FundsService {
       row.platformReversalCents !== attempt.platformAmountCents || row.currency !== 'CNY' || row.userId !== attempt.userId || row.orderId !== attempt.orderId) throw new BadRequestException('退款金额快照不一致');
   }
   private payee(angel: any) {
-    if (!angel || angel.status !== 'APPROVED' || !angel.isVerified || !text(angel.wechatOpenId, 64)) throw new BadRequestException('请先完成天使审核并使用微信登录');
+    if (!angel || angel.status !== 'APPROVED' || !angel.isVerified || !text(angel.wechatOpenId, 64) ||
+      !this.config.wechatAppId || angel.wechatAppId !== this.config.wechatAppId) {
+      throw new BadRequestException('请先完成天使审核并使用当前小程序微信登录');
+    }
   }
   private merchantId() { return process.env.WECHAT_PAY_MCH_ID ?? ''; }
   private requireRefundConfigured() {

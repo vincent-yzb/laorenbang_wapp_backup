@@ -49,7 +49,7 @@ class MemoryDatabase {
 
   constructor() {
     this.state = {
-      user: [{ id: 'child', wechatOpenId: payer }],
+      user: [{ id: 'child', wechatOpenId: payer, wechatAppId: appId }],
       order: [{ id: 'order', orderNo: 'synthetic-order', userId: 'child', elderlyId: 'elder', angelId: 'angel',
         status: 'PENDING_CONFIRM', isPaid: false, price: 123.45, priceCents: 12345n,
         paidAttemptId: null, paymentOrigin: null, paymentMethod: null, completedAt: null }],
@@ -151,6 +151,16 @@ function fixture(t: TestContext, overrides: Record<string, string | undefined> =
     query: (value: Record<string, any>) => { queryResource = value; },
     queryError: (value: boolean) => { queryError = value; } };
 }
+
+test('真实付款拒绝旧 AppID 或无归属 payer，在创建 attempt 和调用商户前失败', async t => {
+  const f = fixture(t);
+  for (const wechatAppId of [null, 'wxfedcba9876543210']) {
+    f.db.state.user[0].wechatAppId = wechatAppId;
+    await assert.rejects(f.service.createPayment('child', { orderId: 'order' }), BadRequestException);
+    assert.equal(f.db.state.paymentAttempt.length, 0); assert.equal(f.db.writes, 0);
+    assert.equal(f.calls.create, 0); assert.equal(f.calls.query, 0);
+  }
+});
 
 test('未配置真实网关在生产或未显式development mock时零读写、零商户调用', async t => {
   const f = fixture(t, { WECHAT_PAY_ENABLED: 'false', ALLOW_MOCK_PAYMENT: 'true' });

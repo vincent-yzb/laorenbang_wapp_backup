@@ -1,12 +1,21 @@
 # 微信支付商户开通与小额验收
 
-更新：2026-10-08。当前用户具备营业执照，尚未申请微信支付商户号。代码准备不等于微信已允许收款。
+更新：2026-10-08。用户已开通商户并提供商户号；商户号已写入本机私有配置。用户已选择复用已认证企业小程序作为目标，商户与小程序主体一致；目标AppID为 `wxdd2e919828dc8482`。前后端微信登录与支付签名须同步使用此AppID，实际发布状态以交付记录和本机发布收据为准。目标小程序绑定及API安全材料仍待完成，真实收款与转账保持关闭。
+
+
+## 企业小程序替换准备
+
+目标企业小程序已认证，尚未发布；用户确认其主体与支付商户号主体一致。复用该账号承载老人帮，不办理原个人小程序的主体变更。先在企业小程序后台按实际业务申请名称、简介、图标、服务类目、隐私说明和备案；当前“工具 > 信息查询”不能作为老人帮实际服务类目的验收结果。名称和类目以平台审核结果为准。
+
+新小程序的AppSecret只在主仓 `.local/wechat-enterprise.env`（600）填写，不发聊天、不提交Git。小程序项目配置与构建产物已指向新AppID；新AppSecret已通过官方稳定令牌接口验证。后端发布须同时使用匹配的AppID/AppSecret，并轮换登录签名密钥，再验收新预览。不得只改客户端AppID就视为切换完成。
+
+切换准备记录为 `.local/wechat-enterprise-switch.json`，原项目配置备份在 `.local/wechat-app-switch-before/`。切换不重置数据库。旧测试账号与订单保留；User/Angel新增可空wechatAppId，不从旧openid猜测归属。新微信登录绑定当前AppID，JWT与刷新令牌包含AppID，旧/无归属令牌失效；资金入口再次核对数据库中的微信AppID。新AppID下重新微信登录，不覆盖旧openid，不自动认领旧账号。发布工具要求先备份，确认没有未决资金记录，再增量迁移与同步配置。
 
 ## 你现在可以办理的步骤
 
-1. 在[微信支付商户平台](https://pay.weixin.qq.com/)按真实营业执照主体申请普通商户，按页面提交主体、经营、联系人和结算账户资料，完成平台要求的审核、验证和签约。不要申请与实际业务无关的主体或类目。支持主体与绑定要求见[官方说明](https://pay.wechatpay.cn/doc/v3/partner/4012081990)。
-2. 商户通过后，开通小程序支付，并将商户号绑定到本项目现有小程序 AppID，完成两侧需要的确认。不要把公众号 AppID 或其他小程序身份混入本项目。
-3. 商户平台 API 安全中设置 APIv3 密钥，生成/下载商户 API 证书和商户私钥，取得证书序列号。取得微信支付公钥与对应 `PUB_KEY_ID_...`。本实现采用微信支付公钥验签；平台证书模式尚未实现。
+1. 在[微信支付商户平台](https://pay.weixin.qq.com/)「产品中心 → JSAPI支付」确认产品已开通；小程序支付使用该权限。[官方权限说明](https://pay.wechatpay.cn/doc/v3/merchant/4012791895)。
+2. 在商户平台「产品中心 → APPID授权管理（或AppID账号管理）→ 关联AppID」关联 `wxdd2e919828dc8482`；再登录该小程序的[公众平台](https://mp.weixin.qq.com/)「微信支付 → 商户号管理」确认同一商户号。管理员本人阅读并确认相关协议，两侧确认后核对已绑定状态。[官方绑定流程](https://pay.wechatpay.cn/doc/v3/merchant/4013287504)。
+3. 在商户平台「账户中心 → API安全」设置32位数字/大小写字母的 APIv3 密钥，申请普通RSA商户 API 证书并保管同一套 `apiclient_cert.pem` 与 `apiclient_key.pem`。从「微信支付公钥 → 管理公钥」下载微信支付公钥及完整 `PUB_KEY_ID_...`。本实现采用公钥验签，不接受平台证书模式；新商户从未接入平台证书可直接使用公钥，如果曾接入其他系统须先核对切换状态。[证书](https://pay.wechatpay.cn/doc/v3/merchant/4012072428)、[APIv3密钥](https://pay.wechatpay.cn/doc/v3/merchant/4012072195)、[公钥获取](https://pay.wechatpay.cn/doc/v3/merchant/4013038816)、[新商户接入说明](https://pay.wechatpay.cn/doc/v3/merchant/4012154180)。
 4. 需要向天使微信零钱出款时，另申请商家转账用户确认模式及实际适用场景权限，按商户平台配置场景、收款感知与报备字段。没有转账权限时，收款与退款可以独立验收，提现保持关闭。
 5. 在微信公众平台配置小程序 request 合法 HTTPS 域名；真机验收关闭“开发调试”后重试。现有手机开启调试才能登录的结果不能替代正式合法域名验收。
 
@@ -32,6 +41,19 @@
 | WECHAT_TRANSFER_USER_RECV_PERCEPTION | 商户获批的收款感知 |
 | WECHAT_TRANSFER_SCENE_REPORT_INFOS_JSON | 按场景要求填写的 info_type/info_content 数组 |
 | WECHAT_TRANSFER_NOTIFY_URL | HTTPS `/api/payment/transfer-notify` |
+
+### 本机导入准备
+
+主仓已建立私密目录 `.local/wechat-pay-materials/`（700），说明及 `input.env` 均为600。放入以下文件，材料文件权限设为600：
+
+- `apiclient_cert.pem`：此商户的API证书。
+- `apiclient_key.pem`：同一套商户私钥。
+- `wechatpay_public_key.pem`：官方下载的微信支付公钥，可复制后改为此文件名。
+- `input.env`：仅在本机填写 APIv3 密钥与完整公钥ID，不加引号。
+
+从主仓执行 `node .local/prepare-wechat-pay.cjs status` 查看缺项和目标/当前服务端AppID；该工具已锁新企业AppID，服务端身份尚未同步时拒绝导入。身份同步、材料齐全后执行 `node .local/prepare-wechat-pay.cjs import`。导入检查证书商户号、有效期、私钥匹配、RSA强度、密钥格式及固定测试回调地址，自动提取序列号与Base64，并准备独立运营凭证；只写本机 `.local/wechat-pay.env`，两个资金开关仍为false，不访问网络、不更改云端、不产生交易。证书归属检查依据[官方证书排错说明](https://pay.wechatpay.cn/doc/v3/merchant/4012365345)。
+
+导入成功不能证明APIv3密钥正确、公钥ID与文件来源相符、AppID已绑定或产品权限已开通；这些仍需核对商户后台并进行签名接口与真机验收。当前本机工具已通过12项临时证书验证，不使用真实密钥、不产生资金操作。
 
 当前 staging 基址为 `https://laorenbang-staging-20261008.onrender.com`。该免费实例与免费数据库只用于测试，不自动升级付费配置。正式收款前需安排持续运行、数据库备份及到期处理；当前测试数据库到期时间为 2026-11-07 13:48 UTC。
 
