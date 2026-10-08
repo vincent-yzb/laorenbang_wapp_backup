@@ -51,8 +51,8 @@ class FakePrisma {
     this.state = {
       orders: [order],
       angels: [
-        { id: 'angel-1', balance: 0, completedOrders: 0, isVerified: true, status: 'APPROVED', isOnline: true },
-        { id: 'angel-2', balance: 0, completedOrders: 0, isVerified: true, status: 'APPROVED', isOnline: true },
+        { id: 'angel-1', balance: 0, balanceCents: 0n, frozenBalanceCents: 0n, openingBalanceCents: 0n, nonWithdrawableBalanceCents: 0n, completedOrders: 0, isVerified: true, status: 'APPROVED', isOnline: true },
+        { id: 'angel-2', balance: 0, balanceCents: 0n, frozenBalanceCents: 0n, openingBalanceCents: 0n, nonWithdrawableBalanceCents: 0n, completedOrders: 0, isVerified: true, status: 'APPROVED', isOnline: true },
       ],
       elderly: [{ id: 'elderly-1', userId: 'child-1' }],
       services: [{ id: 'medical', price: 100, isActive: true }, { id: 'custom', price: 0, isActive: true }],

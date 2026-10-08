@@ -10,16 +10,21 @@ import {
   HttpStatus,
   Param,
   ForbiddenException,
+  Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { PaymentService } from './payment.service';
-import { CreatePaymentDto, RefundDto, WithdrawDto } from './dto/payment.dto';
+import { CreatePaymentDto, RefundDto, WithdrawDto, RejectFundsDto } from './dto/payment.dto';
+import { FundsService } from './funds.service';
+import { WechatPayGateway } from './wechat-pay.gateway';
+import { PaymentOperatorGuard } from './payment-operator.guard';
 
 @ApiTags('支付')
 @Controller('payment')
 export class PaymentController {
-  constructor(private paymentService: PaymentService) {}
+  constructor(private paymentService: PaymentService, @Optional() private funds?: FundsService, @Optional() private gateway?: WechatPayGateway) {}
 
   @Post('create')
   @UseGuards(AuthGuard('jwt'))
@@ -45,9 +50,9 @@ export class PaymentController {
   @ApiOperation({ summary: '微信支付回调' })
   @ApiResponse({ status: 200, description: '处理成功' })
   async wechatNotify(
-    @Body() body: any,
+    @Request() req: any,
   ) {
-    return this.paymentService.handleWechatCallback(body);
+    return this.paymentService.handleWechatCallback(req.rawBody, req.headers);
   }
 
   @Post('refund')
@@ -83,6 +88,90 @@ export class PaymentController {
     this.requireRole(req, 'angel');
     return this.paymentService.getIncomeRecords(req.user.id, +page, +pageSize);
   }
+
+  @Post('refund-notify')
+  @HttpCode(HttpStatus.OK)
+  async refundNotify(@Request() req: any) {
+    const event = this.getGateway().verifyNotification(req.rawBody, req.headers);
+    await this.getFunds().handleRefundNotification(event);
+    return { code: 'SUCCESS', message: '成功' };
+  }
+
+  @Post('transfer-notify')
+  @HttpCode(HttpStatus.OK)
+  async transferNotify(@Request() req: any) {
+    const event = this.getGateway().verifyNotification(req.rawBody, req.headers);
+    await this.getFunds().handleTransferNotification(event);
+    return { code: 'SUCCESS', message: '成功' };
+  }
+
+  @Get('refunds')
+  @UseGuards(AuthGuard('jwt'))
+  async refunds(@Request() req: any, @Query('orderId') orderId?: string) {
+    this.requireRole(req, 'child');
+    return this.getFunds().listRefunds(req.user.id, orderId);
+  }
+
+  @Get('refund/:id')
+  @UseGuards(AuthGuard('jwt'))
+  async refundStatus(@Request() req: any, @Param('id') id: string) {
+    this.requireRole(req, 'child');
+    return this.getFunds().getRefundStatus(req.user.id, id, { reconcile: true });
+  }
+
+  @Get('withdrawals')
+  @UseGuards(AuthGuard('jwt'))
+  async withdrawals(@Request() req: any) {
+    this.requireRole(req, 'angel');
+    return this.getFunds().listWithdrawals(req.user.id);
+  }
+
+  @Get('withdraw/:id')
+  @UseGuards(AuthGuard('jwt'))
+  async withdrawalStatus(@Request() req: any, @Param('id') id: string) {
+    this.requireRole(req, 'angel');
+    return this.getFunds().getWithdrawalStatus(req.user.id, id, { reconcile: true });
+  }
+
+  @Post('operator/refunds/:id/approve')
+  @UseGuards(PaymentOperatorGuard)
+  async approveRefund(@Request() req: any, @Param('id') id: string) {
+    return this.getFunds().approveRefund(id, req.paymentOperator);
+  }
+
+  @Post('operator/refunds/:id/reject')
+  @UseGuards(PaymentOperatorGuard)
+  async rejectRefund(@Request() req: any, @Param('id') id: string, @Body() dto: RejectFundsDto) {
+    return this.getFunds().rejectRefund(id, req.paymentOperator, dto.reason);
+  }
+
+  @Post('operator/withdrawals/:id/approve')
+  @UseGuards(PaymentOperatorGuard)
+  async approveWithdrawal(@Request() req: any, @Param('id') id: string) {
+    return this.getFunds().approveWithdrawal(id, req.paymentOperator);
+  }
+
+  @Post('operator/withdrawals/:id/reject')
+  @UseGuards(PaymentOperatorGuard)
+  async rejectWithdrawal(@Request() req: any, @Param('id') id: string, @Body() dto: RejectFundsDto) {
+    return this.getFunds().rejectWithdrawal(id, req.paymentOperator, dto.reason);
+  }
+
+  @Post('operator/reconcile')
+  @UseGuards(PaymentOperatorGuard)
+  async reconcile() {
+    await this.paymentService.reconcilePending(100);
+    return { success: true, message: '本轮待核实资金记录已查询' };
+  }
+
+  @Get('operator/configuration')
+  @UseGuards(PaymentOperatorGuard)
+  configuration() {
+    return { success: true, data: { ...this.getGateway().configurationStatus(), transferEnabled: this.getGateway().transferIsConfigured() } };
+  }
+
+  private getFunds() { if (!this.funds) throw new ServiceUnavailableException('资金服务尚未配置'); return this.funds; }
+  private getGateway() { if (!this.gateway) throw new ServiceUnavailableException('微信支付尚未配置'); return this.gateway; }
 
   private requireRole(req: any, role: 'child' | 'angel'): void {
     if (req.user?.userType !== role) throw new ForbiddenException('无权执行此操作');

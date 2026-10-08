@@ -75,3 +75,15 @@ API 前缀为 `/api`，开发文档为 `/api/docs`。未配置微信账号时登
 - [开发计划](../docs/WEAPP_DEVELOPMENT_PLAN.md)
 - [专业提示词](../docs/WEAPP_DEVELOPMENT_PROMPT.md)
 - [本轮交付和验收](../docs/WEAPP_P0_DELIVERY.md)
+
+
+## 微信支付链路（2026-10-08）
+
+已实现普通商户 APIv3 预下单、raw-body 回调验签/解密、主动查单与补偿、全额退款审批和微信用户确认模式提现。金额使用 BigInt 分记账，历史余额和模拟收入不可提现。`WECHAT_PAY_ENABLED`、`WECHAT_TRANSFER_ENABLED` 默认关闭；当前运营主体尚无商户号，真实扣款/退款/到账尚未验收。
+
+- [支付计划](docs/WEAPP_PAYMENT_PLAN.md)、[实施提示词](docs/WEAPP_PAYMENT_PROMPT.md)
+- [商户开通、私密配置与真机验收](docs/WECHAT_PAY_ACTIVATION.md)，服务端模板 `env.payment.example`
+- `npm test`：离线业务、加密和 HTTP 边界验证。
+- `node scripts/test-financial.cjs`：仅本机专属 PG 的迁移、真实支付状态机、退款/提现竞争与回滚验证；先按 `scripts/db/README.md` 配置隔离库。所有微信资金接口均用虚构网关，不进行真实交易。
+
+现有数据库必须先备份，再执行增量迁移。不要 reset/db push 或跳过失败迁移；不可将旧 Float 钱包写入器与新分记账系统并行运行。

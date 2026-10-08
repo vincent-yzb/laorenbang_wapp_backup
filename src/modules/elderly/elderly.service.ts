@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 import { CreateElderlyDto, UpdateElderlyDto } from './dto/elderly.dto';
 import { validateInput } from '../auth/validate-input';
@@ -153,21 +154,22 @@ export class ElderlyService {
       throw new ForbiddenException('无权操作');
     }
 
-    // 检查是否有进行中的订单
-    const activeOrders = await this.prisma.order.count({
-      where: {
-        elderlyId,
-        status: { in: ['PENDING', 'PAID', 'ACCEPTED', 'ON_WAY', 'ARRIVED', 'IN_PROGRESS'] },
-      },
-    });
+    // Order history keeps its elderly relation, including cancelled and completed orders.
+    const relatedOrders = await this.prisma.order.count({ where: { elderlyId } });
 
-    if (activeOrders > 0) {
-      throw new BadRequestException('该老人有进行中的订单，无法删除');
+    if (relatedOrders > 0) {
+      throw new BadRequestException('该老人有关联订单记录，无法删除');
     }
 
-    await this.prisma.elderly.delete({
-      where: { id: elderlyId },
-    });
+    try {
+      await this.prisma.elderly.delete({ where: { id: elderlyId } });
+    } catch (error) {
+      // An order created after the count is still protected by the database foreign key.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+        throw new BadRequestException('该老人有关联订单记录，无法删除');
+      }
+      throw error;
+    }
 
     return {
       success: true,

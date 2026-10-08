@@ -21,7 +21,7 @@ CONTAINER = 'lrb-integration-20261008'
 DB = USER = 'lrb_integration'
 PORT = 55432
 DOCKER = ['/usr/local/bin/docker', '--host', 'unix://' + str(Path.home() / '.docker/run/docker.sock')]
-NODE = Path(os.environ.get('LRB_NODE_BIN', str(Path.home() / '.nvm/versions/node/v20.20.0/bin/node')))
+NODE = Path(os.environ.get('LRB_NODE_BIN', shutil.which('node') or str(Path.home() / '.nvm/versions/node/v22.22.0/bin/node')))
 
 
 def private_file(path, text):
@@ -95,6 +95,9 @@ def start():
 
 
 def cli_env():
+    version = subprocess.run([str(NODE), '--version'], capture_output=True, text=True, check=True).stdout.strip()
+    if not version.startswith('v22.'):
+        raise RuntimeError('Node22 is required; set LRB_NODE_BIN to the reviewed runtime')
     env = dict(os.environ)
     env.update(credentials())
     env['PRISMA_HIDE_UPDATE_MESSAGE'] = 'true'
@@ -152,7 +155,7 @@ def check():
 
 def test():
     env = cli_env()
-    env.update({'LRB_INTEGRATION_DB': 'true', 'NODE_ENV': 'development', 'ALLOW_MOCK_PAYMENT': 'true'})
+    env.update({'LRB_INTEGRATION_DB': 'true', 'NODE_ENV': 'development', 'ALLOW_MOCK_PAYMENT': 'true', 'WECHAT_PAY_ENABLED': 'false', 'WECHAT_TRANSFER_ENABLED': 'false'})
     run([str(NODE), '--require', 'ts-node/register/transpile-only', '--test', 'test/integration/postgres.test.ts'], env=env, cwd=ROOT)
 
 

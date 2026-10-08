@@ -2,18 +2,6 @@ import { IsString, IsMobilePhone, IsNumber, Min, Max, Length, MaxLength, Validat
 
 class ElderlyDetailsDto {
   @ValidateIf((_, value) => value !== undefined)
-  @IsNumber()
-  @Min(-90)
-  @Max(90)
-  lat?: number;
-
-  @ValidateIf((_, value) => value !== undefined)
-  @IsNumber()
-  @Min(-180)
-  @Max(180)
-  lng?: number;
-
-  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @MaxLength(2048)
   avatar?: string;
@@ -30,6 +18,18 @@ class ElderlyDetailsDto {
 }
 
 export class CreateElderlyDto extends ElderlyDetailsDto {
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat?: number;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng?: number;
+
   @IsString()
   @Length(1, 80)
   name: string;
@@ -47,6 +47,19 @@ export class CreateElderlyDto extends ElderlyDetailsDto {
 }
 
 export class UpdateElderlyDto extends ElderlyDetailsDto {
+  // Omitted coordinates preserve the stored location; explicit null clears it.
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat?: number | null;
+
+  @ValidateIf((_, value) => value !== undefined && value !== null)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng?: number | null;
+
   @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @Length(1, 80)

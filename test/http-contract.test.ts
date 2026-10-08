@@ -42,7 +42,7 @@ test('HTTP routes enforce the P0 response contract and reject unsafe writes', as
 
     const status = await request('/payment/status/order-1');
     assert.equal(status.status, 200);
-    assert.deepEqual(await status.json(), { success: true, data: { orderId: 'order-1', status: 'PENDING_CONFIRM', isPaid: false, completed: false, paymentMethod: null } });
+    assert.deepEqual(await status.json(), { success: true, data: { orderId: 'order-1', status: 'PENDING_CONFIRM', isPaid: false, completed: false, paymentMethod: null, paymentState: 'UNPAID' } });
     assert.equal((await request('/payment/status/order-1', 'GET', undefined, { 'x-test-user': 'stranger' })).status, 403);
     assert.equal((await request('/payment/status/order-1', 'GET', undefined, { 'x-test-role': 'angel' })).status, 403);
     assert.equal((await request('/payment/create', 'POST', { orderId: 'order-1' })).status, 503);

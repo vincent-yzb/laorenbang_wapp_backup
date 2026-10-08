@@ -2,7 +2,7 @@
 // 注意：数据库使用 camelCase 列名，需要 @map 映射
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
 }
 
@@ -16,73 +16,80 @@ datasource db {
 
 // 用户表（子女）
 model User {
-  id          String   @id @default(cuid())
-  phone       String   @unique
-  wechatOpenId String? @unique @map("wechatOpenId")
-  name        String?
-  avatar      String?
-  idCard      String?  @map("idCard")
-  isVerified  Boolean  @default(false) @map("isVerified")
-  createdAt   DateTime @default(now()) @map("createdAt")
-  updatedAt   DateTime @updatedAt @map("updatedAt")
-  
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  wechatOpenId String?  @unique @map("wechatOpenId")
+  name         String?
+  avatar       String?
+  idCard       String?  @map("idCard")
+  isVerified   Boolean  @default(false) @map("isVerified")
+  createdAt    DateTime @default(now()) @map("createdAt")
+  updatedAt    DateTime @updatedAt @map("updatedAt")
+
   // 关联
-  elderly     Elderly[]
-  orders      Order[]
-  
+  elderly         Elderly[]
+  orders          Order[]
+  paymentAttempts PaymentAttempt[]
+  refunds         Refund[]
+
   @@map("users")
 }
 
 // 老人表
 model Elderly {
-  id          String   @id @default(cuid())
-  name        String
-  phone       String
-  avatar      String?
-  idCard      String?  @map("idCard")
-  relation    String
-  address     String
-  lat         Float?
-  lng         Float?
-  inviteCode  String   @unique @map("inviteCode")
-  healthNote  String?  @map("healthNote")
-  angelNote   String?  @map("angelNote")
-  createdAt   DateTime @default(now()) @map("createdAt")
-  updatedAt   DateTime @updatedAt @map("updatedAt")
-  
+  id         String   @id @default(cuid())
+  name       String
+  phone      String
+  avatar     String?
+  idCard     String?  @map("idCard")
+  relation   String
+  address    String
+  lat        Float?
+  lng        Float?
+  inviteCode String   @unique @map("inviteCode")
+  healthNote String?  @map("healthNote")
+  angelNote  String?  @map("angelNote")
+  createdAt  DateTime @default(now()) @map("createdAt")
+  updatedAt  DateTime @updatedAt @map("updatedAt")
+
   // 关联
-  userId      String   @map("userId")
-  user        User     @relation(fields: [userId], references: [id])
-  orders      Order[]
-  
+  userId String  @map("userId")
+  user   User    @relation(fields: [userId], references: [id])
+  orders Order[]
+
   @@map("elderly")
 }
 
 // 天使表（服务提供者）
 model Angel {
-  id              String   @id @default(cuid())
-  phone           String   @unique
-  wechatOpenId     String?  @unique @map("wechatOpenId")
-  name            String
-  avatar          String?
-  idCard          String?  @map("idCard")
-  idCardFront     String?  @map("idCardFront")
-  idCardBack      String?  @map("idCardBack")
-  isVerified      Boolean  @default(false) @map("isVerified")
-  status          String   @default("PENDING")
-  rating          Float    @default(5.0)
-  completedOrders Int      @default(0) @map("completedOrders")
-  balance         Float    @default(0)
-  lat             Float?
-  lng             Float?
-  isOnline        Boolean  @default(false) @map("isOnline")
-  createdAt       DateTime @default(now()) @map("createdAt")
-  updatedAt       DateTime @updatedAt @map("updatedAt")
-  
+  id                          String   @id @default(cuid())
+  phone                       String   @unique
+  wechatOpenId                String?  @unique @map("wechatOpenId")
+  name                        String
+  avatar                      String?
+  idCard                      String?  @map("idCard")
+  idCardFront                 String?  @map("idCardFront")
+  idCardBack                  String?  @map("idCardBack")
+  isVerified                  Boolean  @default(false) @map("isVerified")
+  status                      String   @default("PENDING")
+  rating                      Float    @default(5.0)
+  completedOrders             Int      @default(0) @map("completedOrders")
+  balance                     Float    @default(0)
+  balanceCents                BigInt   @default(0)
+  frozenBalanceCents          BigInt   @default(0)
+  openingBalanceCents         BigInt   @default(0)
+  nonWithdrawableBalanceCents BigInt   @default(0)
+  lat                         Float?
+  lng                         Float?
+  isOnline                    Boolean  @default(false) @map("isOnline")
+  createdAt                   DateTime @default(now()) @map("createdAt")
+  updatedAt                   DateTime @updatedAt @map("updatedAt")
+
   // 关联
-  orders          Order[]
-  incomeRecords   IncomeRecord[]
-  
+  orders        Order[]
+  incomeRecords IncomeRecord[]
+  withdrawals   Withdrawal[]
+
   @@map("angels")
 }
 
@@ -95,6 +102,7 @@ model ServiceType {
   icon        String
   description String
   price       Float
+  priceCents  BigInt?
   unit        String
   duration    String
   category    String
@@ -102,10 +110,10 @@ model ServiceType {
   sortOrder   Int      @default(0) @map("sortOrder")
   createdAt   DateTime @default(now()) @map("createdAt")
   updatedAt   DateTime @updatedAt @map("updatedAt")
-  
+
   // 关联
-  orders      Order[]
-  
+  orders Order[]
+
   @@map("service_types")
 }
 
@@ -113,10 +121,10 @@ model ServiceType {
 
 // 订单表
 model Order {
-  id            String      @id @default(cuid())
-  orderNo       String      @unique @map("orderNo")
-  status        String      @default("PENDING")
-  
+  id      String @id @default(cuid())
+  orderNo String @unique @map("orderNo")
+  status  String @default("PENDING")
+
   // 服务信息
   serviceTypeId String      @map("serviceTypeId")
   serviceType   ServiceType @relation(fields: [serviceTypeId], references: [id])
@@ -125,43 +133,48 @@ model Order {
   lat           Float?
   lng           Float?
   remark        String?
-  
+
   // 费用
   price         Float
-  isPaid        Boolean     @default(false) @map("isPaid")
-  paidAt        DateTime?   @map("paidAt")
-  paymentMethod String?     @map("paymentMethod")
-  
+  priceCents    BigInt?
+  paidAttemptId String?
+  paymentOrigin String?
+  isPaid        Boolean   @default(false) @map("isPaid")
+  paidAt        DateTime? @map("paidAt")
+  paymentMethod String?   @map("paymentMethod")
+
   // 子女信息
-  userId        String      @map("userId")
-  user          User        @relation(fields: [userId], references: [id])
-  
+  userId String @map("userId")
+  user   User   @relation(fields: [userId], references: [id])
+
   // 老人信息
-  elderlyId     String      @map("elderlyId")
-  elderly       Elderly     @relation(fields: [elderlyId], references: [id])
-  
+  elderlyId String  @map("elderlyId")
+  elderly   Elderly @relation(fields: [elderlyId], references: [id])
+
   // 天使信息
-  angelId       String?     @map("angelId")
-  angel         Angel?      @relation(fields: [angelId], references: [id])
-  
+  angelId String? @map("angelId")
+  angel   Angel?  @relation(fields: [angelId], references: [id])
+
   // 服务进度
-  acceptedAt    DateTime?   @map("acceptedAt")
-  arrivedAt     DateTime?   @map("arrivedAt")
-  startedAt     DateTime?   @map("startedAt")
-  completedAt   DateTime?   @map("completedAt")
-  cancelledAt   DateTime?   @map("cancelledAt")
-  cancelReason  String?     @map("cancelReason")
-  
+  acceptedAt   DateTime? @map("acceptedAt")
+  arrivedAt    DateTime? @map("arrivedAt")
+  startedAt    DateTime? @map("startedAt")
+  completedAt  DateTime? @map("completedAt")
+  cancelledAt  DateTime? @map("cancelledAt")
+  cancelReason String?   @map("cancelReason")
+
   // 评价
-  rating        Float?
-  comment       String?
-  
-  createdAt     DateTime    @default(now()) @map("createdAt")
-  updatedAt     DateTime    @updatedAt @map("updatedAt")
-  
+  rating  Float?
+  comment String?
+
+  createdAt DateTime @default(now()) @map("createdAt")
+  updatedAt DateTime @updatedAt @map("updatedAt")
+
   // 关联
-  timelines     OrderTimeline[]
-  
+  timelines       OrderTimeline[]
+  paymentAttempts PaymentAttempt[]
+  refunds         Refund[]
+
   @@map("orders")
 }
 
@@ -174,7 +187,7 @@ model OrderTimeline {
   content   String
   operator  String?
   createdAt DateTime @default(now()) @map("createdAt")
-  
+
   @@map("order_timelines")
 }
 
@@ -182,14 +195,153 @@ model OrderTimeline {
 
 // 天使收入记录
 model IncomeRecord {
-  id          String   @id @default(cuid())
-  angelId     String   @map("angelId")
-  angel       Angel    @relation(fields: [angelId], references: [id])
-  amount      Float
-  type        String
-  description String
-  orderId     String?  @map("orderId")
-  createdAt   DateTime @default(now()) @map("createdAt")
-  
+  id               String   @id @default(cuid())
+  angelId          String   @map("angelId")
+  angel            Angel    @relation(fields: [angelId], references: [id])
+  amount           Float
+  amountCents      BigInt?
+  entryKey         String?  @unique
+  entryType        String   @default("LEGACY")
+  paymentAttemptId String?
+  refundId         String?
+  withdrawalId     String?
+  type             String
+  description      String
+  orderId          String?  @map("orderId")
+  createdAt        DateTime @default(now()) @map("createdAt")
+
   @@map("income_records")
+}
+
+// Verified provider receipts remain distinct from development mock and unverifiable history.
+model PaymentAttempt {
+  id                  String         @id @default(cuid())
+  orderId             String
+  order               Order          @relation(fields: [orderId], references: [id])
+  userId              String
+  user                User           @relation(fields: [userId], references: [id])
+  mode                String
+  status              String         @default("CREATING")
+  outTradeNo          String         @unique
+  activeOrderId       String?        @unique
+  transactionId       String?        @unique
+  prepayId            String?
+  amountCents         BigInt
+  currency            String         @default("CNY")
+  commissionBps       Int            @default(2000)
+  angelAmountCents    BigInt
+  platformAmountCents BigInt
+  appId               String
+  merchantId          String
+  payerIdentityHash   String
+  paidAt              DateTime?
+  expiresAt           DateTime?
+  lastQueryAt         DateTime?
+  nextQueryAt         DateTime?
+  lastErrorCode       String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  events              PaymentEvent[]
+  refund              Refund?
+
+  @@index([orderId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, nextQueryAt])
+  @@map("payment_attempts")
+}
+
+// Durable, verified event metadata only: no raw payload, openid, phone or credentials.
+model PaymentEvent {
+  id               String          @id @default(cuid())
+  eventId          String          @unique
+  source           String
+  eventType        String
+  paymentAttemptId String?
+  paymentAttempt   PaymentAttempt? @relation(fields: [paymentAttemptId], references: [id])
+  refundId         String?
+  refund           Refund?         @relation(fields: [refundId], references: [id])
+  withdrawalId     String?
+  withdrawal       Withdrawal?     @relation(fields: [withdrawalId], references: [id])
+  payloadDigest    String
+  verifiedAt       DateTime
+  receivedAt       DateTime        @default(now())
+  processedAt      DateTime?
+  status           String          @default("RECEIVED")
+  retryCount       Int             @default(0)
+  nextRetryAt      DateTime?
+  errorCode        String?
+
+  @@index([status, nextRetryAt])
+  @@map("payment_events")
+}
+
+// First release supports one full refund per verified payment attempt.
+model Refund {
+  id                    String         @id @default(cuid())
+  orderId               String
+  order                 Order          @relation(fields: [orderId], references: [id])
+  paymentAttemptId      String         @unique
+  paymentAttempt        PaymentAttempt @relation(fields: [paymentAttemptId], references: [id])
+  userId                String
+  user                  User           @relation(fields: [userId], references: [id])
+  outRefundNo           String         @unique
+  providerRefundId      String?        @unique
+  amountCents           BigInt
+  angelReversalCents    BigInt
+  platformReversalCents BigInt
+  currency              String         @default("CNY")
+  reason                String
+  status                String         @default("REQUESTED")
+  requestedAt           DateTime       @default(now())
+  approvedAt            DateTime?
+  approvedBy            String?
+  rejectedAt            DateTime?
+  rejectedBy            String?
+  rejectionReason       String?
+  frozenAt              DateTime?
+  submittedAt           DateTime?
+  successAt             DateTime?
+  lastQueryAt           DateTime?
+  nextQueryAt           DateTime?
+  lastErrorCode         String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  events                PaymentEvent[]
+
+  @@index([status, nextQueryAt])
+  @@index([userId, requestedAt])
+  @@map("refunds")
+}
+
+model Withdrawal {
+  id                 String         @id @default(cuid())
+  angelId            String
+  angel              Angel          @relation(fields: [angelId], references: [id])
+  requestKey         String
+  outBillNo          String         @unique
+  providerTransferId String?        @unique
+  amountCents        BigInt
+  payeeIdentityHash  String
+  status             String         @default("REQUESTED")
+  packageInfo        String?
+  requestedAt        DateTime       @default(now())
+  approvedAt         DateTime?
+  approvedBy         String?
+  rejectedAt         DateTime?
+  rejectedBy         String?
+  rejectionReason    String?
+  frozenAt           DateTime?
+  submittedAt        DateTime?
+  successAt          DateTime?
+  expiresAt          DateTime?
+  lastQueryAt        DateTime?
+  nextQueryAt        DateTime?
+  lastErrorCode      String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  events             PaymentEvent[]
+
+  @@unique([angelId, requestKey])
+  @@index([status, nextQueryAt])
+  @@map("withdrawals")
 }

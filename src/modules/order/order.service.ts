@@ -4,7 +4,7 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CacheService } from '../../cache/cache.service';
 import { CreateOrderDto, QueryOrderDto, NearbyOrdersDto, CancelOrderDto, RateOrderDto, CompleteServiceDto } from './dto/order.dto';
-import { settleOrderIncome, validateMoney } from './order-settlement';
+import { settleOrderIncome, validateMoney, moneyToCents } from './order-settlement';
 
 const relatedUser = { select: { id: true, name: true, phone: true, avatar: true } };
 const relatedAngel = { select: { id: true, name: true, phone: true, avatar: true, rating: true, lat: true, lng: true } };
@@ -40,7 +40,7 @@ export class OrderService {
         data: {
           orderNo: this.generateOrderNo(), status: 'PENDING', serviceTypeId: serviceType.id,
           serviceTime, address: dto.address, lat: dto.lat, lng: dto.lng, remark: dto.remark,
-          price, userId, elderlyId: elderly.id,
+          price, priceCents: moneyToCents(price), userId, elderlyId: elderly.id,
         },
         include: { serviceType: true, elderly: relatedElderly },
       });

@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { MoneySerializationInterceptor } from './modules/payment/money-serialization.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // 全局前缀
   app.setGlobalPrefix('api');
+  app.useGlobalInterceptors(new MoneySerializationInterceptor());
 
   // 全局验证管道
   app.useGlobalPipes(

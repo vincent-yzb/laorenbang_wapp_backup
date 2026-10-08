@@ -82,7 +82,7 @@ async function main() {
   assert.equal(after.completedOrders, before.completedOrders + 1);
   assert.equal(await prisma.orderTimeline.count({ where: { orderId: order.id, event: 'PAID' } }), 1);
   await request('/payment/refund', { method: 'POST', role: 'child', body: { orderId: order.id, reason: '隔离验证' }, expected: 503 });
-  await request('/payment/withdraw', { method: 'POST', role: 'angel', body: { amount: 10, method: 'wechat' }, expected: 503 });
+  await request('/payment/withdraw', { method: 'POST', role: 'angel', body: { amount: 10, method: 'wechat', requestKey: 'http_test_' + prefix }, expected: 503 });
   assert.equal((await prisma.angel.findUnique({ where: { id: ids.angel } })).balance, after.balance);
   await request('/auth/send-code', { method: 'POST', body: { phone: '19900000001', type: 'child' }, expected: 503 });
   console.log(`Isolated HTTP flow passed: ${checks} requests; real JWT + PostgreSQL; eight payments produced one income and one balance increment.`);

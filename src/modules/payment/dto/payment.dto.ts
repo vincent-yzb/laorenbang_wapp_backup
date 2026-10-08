@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsEnum, IsOptional, Min, Max, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsEnum, IsOptional, Min, Max, MaxLength, Matches } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -50,7 +50,12 @@ export class WithdrawDto {
 
   @IsOptional()
   @IsString()
-  bankCardId?: string; // 银行卡ID（银行卡提现时必填）
+  bankCardId?: string; // Legacy clients are rejected by the WeChat-only funds service.
+
+  @IsNotEmpty()
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{16,64}$/, { message: '提现请求标识无效' })
+  requestKey: string;
 }
 
 /**
@@ -80,4 +85,11 @@ export interface MiniProgramPayParams {
   package: string;
   signType: 'RSA';
   paySign: string;
+}
+
+export class RejectFundsDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  reason: string;
 }

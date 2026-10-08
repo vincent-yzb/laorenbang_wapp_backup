@@ -106,7 +106,8 @@ test('真实迁移保留基线旧数据，新增身份列可空且迁移均成�
   assert.equal(angel.wechatOpenId, null);
   assert.equal(elderly.inviteCode, 'C859FD56');
   assert.deepEqual(migrations.map(row => [row.migration_name, row.finished]), [
-    ['20260120_baseline', true], ['20261008_wechat_identity', true],
+    ['20260120_baseline', true], ['20261008_payment_ledger', true],
+    ['20261008_payment_review_audit', true], ['20261008_wechat_identity', true],
   ]);
 });
 
