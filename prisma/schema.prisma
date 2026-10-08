@@ -18,6 +18,7 @@ datasource db {
 model User {
   id          String   @id @default(cuid())
   phone       String   @unique
+  wechatOpenId String? @unique @map("wechatOpenId")
   name        String?
   avatar      String?
   idCard      String?  @map("idCard")
@@ -61,6 +62,7 @@ model Elderly {
 model Angel {
   id              String   @id @default(cuid())
   phone           String   @unique
+  wechatOpenId     String?  @unique @map("wechatOpenId")
   name            String
   avatar          String?
   idCard          String?  @map("idCard")

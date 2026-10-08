@@ -1,7 +1,9 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CacheService } from '../../cache/cache.service';
+import { createHash } from 'crypto';
+import { IdentityService } from './identity.service';
+import { validateInput } from './validate-input';
 import { ConfigService } from '../../config/config.service';
 import {
   SendCodeDto,
@@ -18,55 +20,26 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-    private cacheService: CacheService,
+    private identityService: IdentityService,
     private configService: ConfigService,
   ) {}
 
   /**
    * 发送短信验证码
    */
-  async sendCode(dto: SendCodeDto): Promise<{ success: boolean; message: string; code?: string }> {
-    const { phone, type } = dto;
-
-    // 检查发送频率
-    const canSend = await this.cacheService.checkSendLimit(phone);
-    if (!canSend) {
-      throw new BadRequestException('发送太频繁，请1分钟后再试');
-    }
-
-    // 生成6位验证码
-    const code = Math.random().toString().slice(2, 8);
-
-    // 存储验证码（5分钟有效）
-    await this.cacheService.setVerificationCode(phone, code, 300);
-
-    // TODO: 调用短信服务发送验证码
-    // await this.smsService.send(phone, code);
-
-    console.log(`[SMS] 发送验证码到 ${phone}: ${code}`);
-
-    return {
-      success: true,
-      message: '验证码已发送',
-      // 开发环境返回验证码
-      ...(this.configService.isDevelopment && { code }),
-    };
+  async sendCode(dto: SendCodeDto) {
+    return this.identityService.sendCode(dto);
   }
 
   /**
    * 手机号验证码登录
    */
   async phoneLogin(dto: PhoneLoginDto): Promise<LoginResponse> {
-    const { phone, code, userType } = dto;
-
-    // 验证验证码
-    const storedCode = await this.cacheService.getVerificationCode(phone);
-    if (!storedCode || storedCode !== code) {
-      throw new BadRequestException('验证码错误或已过期');
+    const { phone, code, userType } = validateInput(PhoneLoginDto, dto);
+    if (userType === UserType.ELDERLY) {
+      throw new BadRequestException('老人用户请使用邀请码登录');
     }
-
-    // 删除已使用的验证码
-    await this.cacheService.deleteVerificationCode(phone);
+    await this.identityService.consumePhoneCode(phone, code);
 
     // 根据用户类型处理登录
     let user: any;
@@ -93,109 +66,48 @@ export class AuthService {
     return this.generateTokenResponse(user, userType);
   }
 
-  /**
-   * 微信登录（静默登录）
-   * 
-   * 根据微信 openid 自动创建或查找用户，实现无感登录
-   * 如果微信配置缺失，使用 code 的哈希作为临时标识
-   */
-  async wechatLogin(dto: WechatLoginDto): Promise<LoginResponse> {
-    try {
-    const { code, userType } = dto;
-
-      console.log('[wechatLogin] 开始处理, userType:', userType);
-
-      if (!userType || !['child', 'angel', 'elderly'].includes(userType)) {
-        throw new BadRequestException('用户类型无效');
-      }
-
-      if (userType === UserType.ELDERLY) {
-        throw new BadRequestException('老人用户请使用邀请码登录');
-      }
-
-      let identifier: string;
-
-      // 尝试调用微信 API 获取 openid
-      try {
-    const wxResult = await this.getWechatOpenId(code);
-        console.log('[wechatLogin] 微信API返回:', JSON.stringify(wxResult));
-        
-        if (wxResult.openid) {
-          identifier = wxResult.openid;
-        } else {
-          console.warn('[wechatLogin] 微信 API 调用失败，使用临时开发模式:', wxResult.errmsg);
-          identifier = `dev_${userType}_default`;
-        }
-      } catch (wxError) {
-        console.error('[wechatLogin] 调用微信API出错:', wxError);
-        identifier = `dev_${userType}_default`;
-      }
-
-      console.log('[wechatLogin] 使用标识符:', identifier);
-
-      // 用 phone 字段临时存储标识
-      const fakePhone = `wx_${identifier.slice(-8)}`;
-      console.log('[wechatLogin] 临时手机号:', fakePhone);
-
-      let user: any;
-
-      if (userType === UserType.CHILD) {
-        console.log('[wechatLogin] 创建/查找子女用户...');
-        user = await this.prisma.user.upsert({
-          where: { phone: fakePhone },
-          create: { 
-            phone: fakePhone, 
-            name: '微信用户',
-          },
+  /** 微信身份只通过完整 openid 匹配；上游失败时不创建账号。 */
+  async wechatLogin(input: WechatLoginDto): Promise<LoginResponse> {
+    const { code, userType } = validateInput(WechatLoginDto, input);
+    if (userType === UserType.ELDERLY) {
+      throw new BadRequestException('老人用户请使用邀请码登录');
+    }
+    const wechatOpenId = await this.identityService.getWechatOpenId(code);
+    const phone = `wx_${createHash('sha256').update(wechatOpenId).digest('hex')}`;
+    const user = userType === UserType.CHILD
+      ? await this.prisma.user.upsert({
+          where: { wechatOpenId },
+          create: { wechatOpenId, phone, name: '微信用户' },
+          update: {},
+        })
+      : await this.prisma.angel.upsert({
+          where: { wechatOpenId },
+          create: { wechatOpenId, phone, name: '新天使' },
           update: {},
         });
-        console.log('[wechatLogin] 子女用户:', user?.id);
-      } else if (userType === UserType.ANGEL) {
-        console.log('[wechatLogin] 创建/查找天使用户...');
-        user = await this.prisma.angel.upsert({
-          where: { phone: fakePhone },
-          create: { 
-            phone: fakePhone, 
-            name: '新天使',
-            isOnline: true, // 登录即在线
-          },
-          update: {
-            isOnline: true, // 登录时自动上线
-          },
-        });
-        console.log('[wechatLogin] 天使用户:', user?.id);
-      }
-
-      if (!user) {
-        throw new BadRequestException('用户创建失败');
-      }
-
-      console.log('[wechatLogin] 生成Token...');
-      const response = this.generateTokenResponse(user, userType);
-      console.log('[wechatLogin] 登录成功, userId:', user.id);
-      
-      return response;
-    } catch (error) {
-      console.error('[wechatLogin] 错误:', error);
-      // 重新抛出 BadRequestException，其他错误包装一下
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
-      throw new BadRequestException(`微信登录失败: ${error.message || '未知错误'}`);
-    }
+    return this.generateTokenResponse(user, userType);
   }
 
   /**
    * 老人邀请码登录
    */
   async elderlyLogin(dto: ElderlyLoginDto): Promise<LoginResponse> {
-    const { inviteCode } = dto;
+    const { inviteCode } = validateInput(ElderlyLoginDto, dto);
 
     // 查询老人信息，包含子女（创建者）信息
-    const elderly = await this.prisma.elderly.findUnique({
+    let elderly = await this.prisma.elderly.findUnique({
       where: { inviteCode },
       include: { user: true },
     });
+
+    // Preserve exact historical codes, including lowercase 8-character values.
+    // New codes are uppercase; accept lowercase input only if no exact match exists.
+    if (!elderly && inviteCode !== inviteCode.toUpperCase()) {
+      elderly = await this.prisma.elderly.findUnique({
+        where: { inviteCode: inviteCode.toUpperCase() },
+        include: { user: true },
+      });
+    }
 
     if (!elderly) {
       throw new BadRequestException('邀请码无效');
@@ -294,31 +206,4 @@ export class AuthService {
     };
   }
 
-  /**
-   * 调用微信 API 获取 OpenID
-   */
-  private async getWechatOpenId(code: string): Promise<{
-    openid?: string;
-    unionid?: string;
-    session_key?: string;
-    errcode?: number;
-    errmsg?: string;
-  }> {
-    const appId = this.configService.wechatAppId;
-    const appSecret = this.configService.wechatAppSecret;
-
-    if (!appId || !appSecret) {
-      console.warn('微信小程序配置缺失');
-      return { errcode: -1, errmsg: '微信配置缺失' };
-    }
-
-    try {
-      const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${appId}&secret=${appSecret}&js_code=${code}&grant_type=authorization_code`;
-      const response = await fetch(url);
-      return response.json();
-    } catch (error) {
-      console.error('微信登录接口调用失败:', error);
-      return { errcode: -1, errmsg: '网络错误' };
-    }
-  }
 }

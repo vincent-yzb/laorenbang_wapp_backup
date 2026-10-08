@@ -1,61 +1,34 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { IdentityService } from '../auth/identity.service';
+import { validateInput } from '../auth/validate-input';
+import { UpdateProfileDto } from '../user/dto/user.dto';
+import { ApplyAngelDto, ToggleOnlineDto } from './dto/angel.dto';
 
 @Injectable()
 export class AngelService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private identityService: IdentityService) {}
 
   /**
    * 天使入驻申请
    */
-  async apply(phone: string, data: {
-    name: string;
-    idCard: string;
-    idCardFront: string;
-    idCardBack: string;
-    avatar?: string;
-  }) {
-    // 检查是否已申请
-    const existing = await this.prisma.angel.findUnique({
-      where: { phone },
-    });
-
-    if (existing) {
-      if (existing.status === 'APPROVED') {
-        throw new BadRequestException('您已是认证天使');
-      }
-      if (existing.status === 'PENDING') {
-        throw new BadRequestException('您的申请正在审核中');
-      }
+  async apply(angelId: string, input: ApplyAngelDto) {
+    const data = validateInput(ApplyAngelDto, input);
+    const existing = await this.prisma.angel.findUnique({ where: { id: angelId } });
+    if (!existing) throw new NotFoundException('天使信息不存在');
+    if (existing.phone !== data.phone || existing.phone.startsWith('wx_')) {
+      throw new BadRequestException('请先绑定申请使用的手机号');
     }
-
-    // 创建或更新申请
-    const angel = await this.prisma.angel.upsert({
-      where: { phone },
-      create: {
-        phone,
-        name: data.name,
-        idCard: data.idCard,
-        idCardFront: data.idCardFront,
-        idCardBack: data.idCardBack,
-        avatar: data.avatar,
-        status: 'PENDING',
-      },
-      update: {
-        name: data.name,
-        idCard: data.idCard,
-        idCardFront: data.idCardFront,
-        idCardBack: data.idCardBack,
-        avatar: data.avatar,
-        status: 'PENDING',
+    if (existing.status === 'APPROVED') throw new BadRequestException('您已是认证天使');
+    if (existing.status === 'PENDING' && existing.idCard) throw new BadRequestException('您的申请正在审核中');
+    const angel = await this.prisma.angel.update({
+      where: { id: angelId },
+      data: {
+        name: data.name, idCard: data.idCard, idCardFront: data.idCardFront,
+        idCardBack: data.idCardBack, avatar: data.avatar, status: 'PENDING',
       },
     });
-
-    return {
-      success: true,
-      message: '申请已提交，请等待审核',
-      data: { id: angel.id, status: angel.status },
-    };
+    return { success: true, message: '申请已提交，请等待审核', data: { id: angel.id, status: angel.status } };
   }
 
   /**
@@ -126,7 +99,8 @@ export class AngelService {
   /**
    * 更新天使信息
    */
-  async updateProfile(angelId: string, data: { name?: string; avatar?: string }) {
+  async updateProfile(angelId: string, input: UpdateProfileDto) {
+    const data = validateInput(UpdateProfileDto, input);
     const angel = await this.prisma.angel.update({
       where: { id: angelId },
       data,
@@ -134,7 +108,7 @@ export class AngelService {
 
     return {
       success: true,
-      data: angel,
+      data: { id: angel.id, name: angel.name, avatar: angel.avatar, phone: angel.phone, isVerified: angel.isVerified },
     };
   }
 
@@ -142,6 +116,7 @@ export class AngelService {
    * 切换在线状态
    */
   async toggleOnline(angelId: string, isOnline: boolean) {
+    validateInput(ToggleOnlineDto, { isOnline });
     const angel = await this.prisma.angel.findUnique({
       where: { id: angelId },
     });
@@ -150,7 +125,7 @@ export class AngelService {
       throw new NotFoundException('天使信息不存在');
     }
 
-    if (!angel.isVerified) {
+    if (isOnline && (!angel.isVerified || angel.status !== 'APPROVED')) {
       throw new BadRequestException('请先完成认证');
     }
 
@@ -287,4 +262,28 @@ export class AngelService {
       },
     };
   }
+
+  async bindPhone(angelId: string, phone: string, code: string) {
+    await this.identityService.consumePhoneCode(phone, code);
+    return this.savePhone(angelId, phone);
+  }
+
+  async bindWechatPhone(angelId: string, code: string) {
+    const phone = await this.identityService.getWechatPhone(code);
+    const result = await this.savePhone(angelId, phone);
+    return { ...result, phone: result.data.phone };
+  }
+
+  private async savePhone(angelId: string, phone: string) {
+    const existing = await this.prisma.angel.findUnique({ where: { phone } });
+    if (existing && existing.id !== angelId) throw new BadRequestException('该手机号已被其他账号绑定');
+    try {
+      const angel = await this.prisma.angel.update({ where: { id: angelId }, data: { phone } });
+      return { success: true, message: '手机号绑定成功', data: { phone: angel.phone } };
+    } catch (error) {
+      if (error?.code === 'P2002') throw new BadRequestException('该手机号已被其他账号绑定');
+      throw error;
+    }
+  }
+
 }

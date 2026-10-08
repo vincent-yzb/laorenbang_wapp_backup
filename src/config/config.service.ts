@@ -20,7 +20,12 @@ export class ConfigService {
 
   // JWT 配置
   get jwtSecret(): string {
-    return process.env.JWT_SECRET || 'laorenbang-jwt-secret-dev';
+    const secret = process.env.JWT_SECRET;
+    if (secret) return secret;
+    if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+      throw new Error('JWT_SECRET must be configured outside development and test');
+    }
+    return 'laorenbang-jwt-secret-dev';
   }
 
   get jwtExpiresIn(): string {
@@ -105,4 +110,3 @@ export class ConfigService {
     return process.env.COS_REGION || 'ap-beijing';
   }
 }
-

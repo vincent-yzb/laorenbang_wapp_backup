@@ -27,10 +27,10 @@ npm-debug.log*
 # Test
 coverage/
 
-# Prisma
-prisma/migrations/
+# Prisma migration sources are versioned; generated clients stay in node_modules.
+*.tsbuildinfo
+.local/
 
 # Temp
 tmp/
 temp/
-

@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Post,
-  Put,
+  ForbiddenException,
   Body,
   Param,
   Query,
@@ -32,9 +32,7 @@ export class OrderController {
   @ApiOperation({ summary: '创建订单' })
   @ApiResponse({ status: 201, description: '创建成功' })
   async create(@Request() req, @Body() dto: CreateOrderDto) {
-    console.log('[OrderController] POST /orders 请求到达');
-    console.log('[OrderController] 用户:', req.user?.id, '类型:', req.user?.userType);
-    console.log('[OrderController] 请求体:', JSON.stringify(dto));
+    this.requireRole(req, 'child');
     return this.orderService.create(req.user.id, dto);
   }
 
@@ -49,6 +47,7 @@ export class OrderController {
   @ApiOperation({ summary: '获取附近订单（天使端）' })
   @ApiResponse({ status: 200, description: '获取成功' })
   async getNearbyOrders(@Request() req, @Query() query: NearbyOrdersDto) {
+    this.requireRole(req, 'angel');
     return this.orderService.getNearbyOrders(req.user.id, query);
   }
 
@@ -63,6 +62,7 @@ export class OrderController {
   @ApiOperation({ summary: '天使接单' })
   @ApiResponse({ status: 200, description: '接单成功' })
   async accept(@Request() req, @Param('id') id: string) {
+    this.requireRole(req, 'angel');
     return this.orderService.accept(id, req.user.id);
   }
 
@@ -70,6 +70,7 @@ export class OrderController {
   @ApiOperation({ summary: '天使出发' })
   @ApiResponse({ status: 200, description: '操作成功' })
   async depart(@Request() req, @Param('id') id: string) {
+    this.requireRole(req, 'angel');
     return this.orderService.startDepart(id, req.user.id);
   }
 
@@ -77,6 +78,7 @@ export class OrderController {
   @ApiOperation({ summary: '天使到达' })
   @ApiResponse({ status: 200, description: '操作成功' })
   async arrive(@Request() req, @Param('id') id: string) {
+    this.requireRole(req, 'angel');
     return this.orderService.arrive(id, req.user.id);
   }
 
@@ -84,6 +86,7 @@ export class OrderController {
   @ApiOperation({ summary: '开始服务' })
   @ApiResponse({ status: 200, description: '操作成功' })
   async start(@Request() req, @Param('id') id: string) {
+    this.requireRole(req, 'angel');
     return this.orderService.startService(id, req.user.id);
   }
 
@@ -91,6 +94,7 @@ export class OrderController {
   @ApiOperation({ summary: '完成服务（天使端）' })
   @ApiResponse({ status: 200, description: '操作成功' })
   async complete(@Request() req, @Param('id') id: string, @Body() dto: CompleteServiceDto) {
+    this.requireRole(req, 'angel');
     return this.orderService.completeService(id, req.user.id, dto);
   }
 
@@ -98,6 +102,7 @@ export class OrderController {
   @ApiOperation({ summary: '确认完成（子女端）' })
   @ApiResponse({ status: 200, description: '操作成功' })
   async confirm(@Request() req, @Param('id') id: string) {
+    this.requireRole(req, 'child');
     return this.orderService.confirmComplete(id, req.user.id);
   }
 
@@ -105,6 +110,7 @@ export class OrderController {
   @ApiOperation({ summary: '取消订单' })
   @ApiResponse({ status: 200, description: '取消成功' })
   async cancel(@Request() req, @Param('id') id: string, @Body() dto: CancelOrderDto) {
+    this.requireRole(req, 'child');
     return this.orderService.cancel(id, req.user.id, dto);
   }
 
@@ -112,6 +118,11 @@ export class OrderController {
   @ApiOperation({ summary: '评价订单' })
   @ApiResponse({ status: 200, description: '评价成功' })
   async rate(@Request() req, @Param('id') id: string, @Body() dto: RateOrderDto) {
+    this.requireRole(req, 'child');
     return this.orderService.rate(id, req.user.id, dto);
+  }
+
+  private requireRole(req: any, role: 'child' | 'angel'): void {
+    if (req.user?.userType !== role) throw new ForbiddenException('无权执行此操作');
   }
 }

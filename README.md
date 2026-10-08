@@ -1,214 +1,77 @@
-# 老人帮后端 API
+# 老人帮微信小程序后端
 
-> 让关爱跨越山海的居家养老服务平台 - 后端服务
+本目录是老人帮微信小程序唯一维护与部署入口，使用 NestJS、TypeScript、Prisma 和 PostgreSQL。它是独立 Git 子仓库；父目录 `backend/` 为历史副本，不再独立维护。
 
-## 技术栈
+## 本轮能力
 
-- **框架**: NestJS 10.x
-- **语言**: TypeScript 5.x
-- **ORM**: Prisma 5.x
-- **数据库**: PostgreSQL
-- **缓存**: Redis (可选)
-- **文档**: Swagger/OpenAPI
+老人管理、订单流转和收入记账已有实现。新订单统一服务后付款，订单完成与收入、余额、时间线原子更新。重复付款或确认不重复入账；只有通过审核和实名认证的在线天使可接单。
 
-## 快速开始
+真实微信支付、退款、提现、消息投递和服务轨迹尚未接通，对应接口明确返回 503。生产模式不会生成模拟支付参数，不会先扣余额再宣称转账成功。
 
-### 1. 环境准备
+## 环境和检查
+
+使用 Node.js 22 LTS。`.node-version` 与 `engines: 22.x` 限制主版本；依赖安装使用本目录的锁文件。下列检查不会启动服务或连接数据库：
 
 ```bash
-# 安装 Node.js 18+
-# 安装 PostgreSQL 14+
-
-# 进入目录
-cd backend
-
-# 安装依赖
-npm install
-```
-
-### 2. 配置环境变量
-
-```bash
-# 复制环境配置模板
-cp env.example .env
-
-# 编辑 .env 文件，填写实际配置
-# 至少需要配置 DATABASE_URL
-```
-
-### 3. 初始化数据库
-
-```bash
-# 生成 Prisma Client
 npm run prisma:generate
-
-# 同步数据库结构
-npm run prisma:push
-
-# 填充种子数据（服务类型等）
-npm run prisma:seed
-```
-
-### 4. 启动服务
-
-```bash
-# 开发模式
-npm run start:dev
-
-# 生产模式
+npm test
+npm run type-check
 npm run build
-npm run start:prod
 ```
 
-### 5. 访问服务
+`npm test` 使用 Node 内置测试运行器和已有 ts-node，包含资金状态、并发条件更新、事务回滚、身份绑定、字段与角色权限以及本地 HTTP 契约检查。服务测试使用数据库替身；生产发布前仍需隔离 PostgreSQL 的真实并发测试。
 
-- API 地址: http://localhost:3001/api
-- Swagger 文档: http://localhost:3001/api/docs
+## 本地开发
 
-## 项目结构
+通过安全的服务端配置机制提供环境变量。`env.p0.example` 仅包含占位值，内测必须使用隔离数据库：
 
-```
-backend/
-├── prisma/
-│   ├── schema.prisma    # 数据库模型定义
-│   └── seed.ts          # 种子数据
-├── src/
-│   ├── cache/           # 缓存服务
-│   ├── config/          # 配置服务
-│   ├── prisma/          # Prisma 服务
-│   ├── modules/
-│   │   ├── auth/        # 认证模块
-│   │   ├── user/        # 用户模块
-│   │   ├── elderly/     # 老人管理模块
-│   │   ├── angel/       # 天使模块
-│   │   ├── order/       # 订单模块
-│   │   ├── payment/     # 支付模块
-│   │   ├── message/     # 消息模块
-│   │   └── location/    # 位置服务模块
-│   ├── app.module.ts    # 应用主模块
-│   └── main.ts          # 入口文件
-├── env.example          # 环境变量模板
-├── package.json
-└── tsconfig.json
-```
-
-## API 模块
-
-### 认证 (`/api/auth`)
-- `POST /send-code` - 发送验证码
-- `POST /phone-login` - 手机号登录
-- `POST /wechat-login` - 微信登录
-- `POST /elderly-login` - 老人邀请码登录
-- `POST /refresh` - 刷新 Token
-
-### 用户 (`/api/user`)
-- `GET /profile` - 获取用户信息
-- `PUT /profile` - 更新用户信息
-- `POST /verify` - 实名认证
-- `GET /order-stats` - 订单统计
-
-### 老人管理 (`/api/elderly`)
-- `POST /` - 添加老人
-- `GET /` - 老人列表
-- `GET /:id` - 老人详情
-- `PUT /:id` - 更新老人信息
-- `DELETE /:id` - 删除老人
-- `POST /:id/refresh-invite-code` - 刷新邀请码
-
-### 天使 (`/api/angel`)
-- `POST /apply` - 入驻申请
-- `GET /apply/status` - 申请状态
-- `GET /profile` - 天使信息
-- `PUT /profile` - 更新信息
-- `POST /toggle-online` - 切换在线状态
-- `GET /order-stats` - 订单统计
-- `GET /reviews` - 评价列表
-
-### 订单 (`/api/orders`)
-- `POST /` - 创建订单
-- `GET /` - 订单列表
-- `GET /nearby` - 附近订单（天使）
-- `GET /:id` - 订单详情
-- `POST /:id/accept` - 接单
-- `POST /:id/depart` - 出发
-- `POST /:id/arrive` - 到达
-- `POST /:id/start` - 开始服务
-- `POST /:id/complete` - 完成服务
-- `POST /:id/confirm` - 确认完成
-- `POST /:id/cancel` - 取消订单
-- `POST /:id/rate` - 评价
-
-### 支付 (`/api/payment`)
-- `POST /create` - 创建支付
-- `POST /notify` - 微信回调
-- `POST /refund` - 申请退款
-- `POST /withdraw` - 天使提现
-- `GET /income` - 收入明细
-
-### 消息 (`/api/messages`)
-- `GET /` - 消息列表
-- `GET /unread-count` - 未读数
-- `POST /:id/read` - 标记已读
-- `GET /order/:orderId` - 订单消息
-- `POST /order/:orderId` - 发送消息
-
-### 位置 (`/api/location`)
-- `POST /report` - 上报位置
-- `GET /angel/:orderId` - 天使位置
-- `GET /track/:orderId` - 服务轨迹
-- `GET /reverse-geocode` - 逆地理编码
-- `GET /geocode` - 地理编码
-- `GET /distance` - 计算距离
-
-## 开发指南
-
-### 数据库迁移
+| 配置 | 用途 |
+|---|---|
+| `DATABASE_URL` | 隔离的 PostgreSQL 数据库 |
+| `DIRECT_URL` | Prisma schema 校验和迁移使用的数据库直连地址 |
+| `JWT_SECRET` | 独立随机签名密钥，开发和测试之外必须配置 |
+| `WECHAT_APPID` / `WECHAT_APP_SECRET` | 微信身份和授权手机号接口 |
+| `ALLOW_MOCK_PAYMENT` | 默认关闭，仅显式 development 环境可模拟付款 |
+| `ALLOW_MOCK_SMS` | 默认关闭，仅显式 development 环境可返回内测验证码 |
+| `PORT` | 服务监听端口，默认 3001 |
+| `AMAP_KEY` | 可选服务端地址解析 |
 
 ```bash
-# 创建迁移
-npm run prisma:migrate
-
-# 重置数据库
-npm run db:reset
-
-# 查看数据库
-npm run prisma:studio
+npm run start:dev
 ```
 
-### 测试
+API 前缀为 `/api`，开发文档为 `/api/docs`。未配置微信账号时登录和授权手机号明确失败；没有真实短信供应商时不声称短信已发送。配置文件必须由运行环境加载，源码不自动携带真实凭证。
 
-```bash
-# 单元测试
-npm run test
+生产启动采用 `npm run start:prod`，显式设置 production；模拟开关在此环境不能生效。当前版本不具备真实资金通道，不能直接用于收款试运营。
 
-# 测试覆盖率
-npm run test:cov
-```
+## 关键接口
 
-## 部署
+- 子女与天使微信登录：`POST /api/auth/wechat-login`。
+- 健康检查：`GET /api/health`，实际验证数据库连接。
+- 服务目录和当前价格：`GET /api/services/types`、`GET /api/services/types/:id`。
+- 老人邀请码登录：`POST /api/auth/elderly-login`。
+- 手机绑定：`POST /api/user/bind-phone`、`POST /api/angel/bind-phone`；必须验证并消费有效验证码。
+- 微信授权手机号：`POST /api/user/wechat-phone`、`POST /api/angel/wechat-phone`。
+- 天使申请状态：`GET /api/angel/apply/status`。
+- 订单主线：`/api/orders`、`/:id/accept`、`/:id/depart`、`/:id/arrive`、`/:id/start`、`/:id/complete`。
+- 开发模拟付款：`POST /api/payment/create`；仅本人待付款订单，在显式开发开关下原子完成结算。
+- 付款核实：`GET /api/payment/status/:orderId`；只有服务端 `isPaid && completed` 才表示完成。
+- 历史预付款兼容确认：`POST /api/orders/:id/confirm`；未付款拒绝。
 
-### Docker 部署
+浏览未分配订单使用脱敏预览；已分配详情有角色和归属限制。服务结束后不再向历史客户返回天使新位置，缺失位置不替换为虚构坐标。
 
-```bash
-# 构建镜像
-docker build -t laorenbang-backend .
+## 数据库升级
 
-# 运行容器
-docker run -d -p 3001:3001 --env-file .env laorenbang-backend
-```
+新增 User、Angel 的可空唯一 `wechatOpenId` 字段。应用新代码前，必须审阅 [微信身份迁移说明](prisma/migrations/20261008_wechat_identity/README.md) 和增量 SQL，并完成备份、现有 schema 核对与迁移基线准备。本轮没有连接或迁移业务数据库。
 
-### 环境变量说明
+已新增从仓库旧 schema 重建的初始基线，独立空测试库可依次执行基线与身份增量。现有非空库须先核对实际结构，不能直接首次执行 `migrate deploy` 或未经 diff 就标记基线已应用；旧版 `init.sql` 也不应当作当前 schema 的发布依据。以实际数据库结构、当前 Prisma schema 和经过审阅的迁移历史为准。Prisma [基线说明](https://www.prisma.io/docs/orm/prisma-migrate/workflows/baselining) 解释了现有数据库接入迁移管理的步骤。
 
-| 变量 | 说明 | 必填 |
-|------|------|------|
-| DATABASE_URL | PostgreSQL 连接字符串 | ✅ |
-| JWT_SECRET | JWT 密钥 | ✅ |
-| WECHAT_APPID | 微信小程序 AppID | ⚠️ |
-| WECHAT_APP_SECRET | 微信小程序密钥 | ⚠️ |
-| WECHAT_MCH_ID | 微信支付商户号 | ⚠️ |
-| AMAP_KEY | 高德地图 Key | 可选 |
+独立本地 PostgreSQL 的启动、真实并发测试和迁移检查见 [数据库联调说明](scripts/db/README.md)。完成隔离配置后，`npm run seed:isolated` 创建 9 个明确 ID 的示例服务目录，`npm run start:isolated` 启动 `127.0.0.1:3101`，`npm run test:isolated:http` 验证真实 JWT、HTTP 与数据库业务流程。这三个命令仅允许专属回环测试库，不回退本目录 `.env`；不要运行旧 `prisma/seed.ts` 作为生产初始化脚本。
 
-## License
+旧代码只保留微信身份后八位，无法安全恢复完整身份。历史账号需要受信任恢复与重新绑定，不能按截断值或重复手机号自动认领、合并。旧版非事务结算产生的流水和余额也需发布前只读对账，不自动补差。
 
-MIT
+## 项目交付文档
 
+- [开发计划](../docs/WEAPP_DEVELOPMENT_PLAN.md)
+- [专业提示词](../docs/WEAPP_DEVELOPMENT_PROMPT.md)
+- [本轮交付和验收](../docs/WEAPP_P0_DELIVERY.md)

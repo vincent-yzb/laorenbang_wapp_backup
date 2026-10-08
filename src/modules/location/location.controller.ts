@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -26,6 +27,9 @@ export class LocationController {
     @Request() req,
     @Body() body: { lat: number; lng: number },
   ) {
+    if (req.user.userType !== 'angel') {
+      throw new ForbiddenException('只有天使可以上报服务位置');
+    }
     return this.locationService.reportLocation(req.user.id, body.lat, body.lng);
   }
 
@@ -80,4 +84,3 @@ export class LocationController {
     });
   }
 }
-

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ServiceUnavailableException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CacheService } from '../../cache/cache.service';
 import { ConfigService } from '../../config/config.service';
@@ -24,6 +24,9 @@ export class LocationService {
    * 天使上报位置
    */
   async reportLocation(angelId: string, lat: number, lng: number) {
+    if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lng) || Math.abs(lng) > 180) {
+      throw new BadRequestException('经纬度无效');
+    }
     // 更新数据库中的位置
     await this.prisma.angel.update({
       where: { id: angelId },
@@ -32,19 +35,6 @@ export class LocationService {
 
     // 更新缓存（实时位置，用于快速查询）
     await this.cacheService.setAngelLocation(angelId, lat, lng);
-
-    // 查找进行中的订单，记录轨迹
-    const activeOrders = await this.prisma.order.findMany({
-      where: {
-        angelId,
-        status: { in: ['ON_WAY', 'ARRIVED', 'IN_PROGRESS'] },
-      },
-    });
-
-    // 为每个进行中的订单记录位置轨迹
-    for (const order of activeOrders) {
-      await this.recordTrack(order.id, angelId, lat, lng);
-    }
 
     return {
       success: true,
@@ -71,6 +61,10 @@ export class LocationService {
       throw new ForbiddenException('无权查看');
     }
 
+    if (!['ACCEPTED', 'ON_WAY', 'ARRIVED', 'IN_PROGRESS'].includes(order.status)) {
+      return { success: true, data: null, message: '当前订单不提供实时位置' };
+    }
+
     if (!order.angelId) {
       return {
         success: true,
@@ -79,16 +73,12 @@ export class LocationService {
       };
     }
 
-    // 先从缓存获取
-    let location = await this.cacheService.getAngelLocation(order.angelId);
-
-    // 如果缓存没有，从数据库获取
-    if (!location && order.angel) {
-      location = {
-        lat: order.angel.lat || 0,
-        lng: order.angel.lng || 0,
-        time: Date.now(),
-      };
+    // Expired or missing reports cannot be replaced with invented coordinates or timestamps.
+    const location = await this.cacheService.getAngelLocation(order.angelId);
+    if (!location || !Number.isFinite(location.lat) || Math.abs(location.lat) > 90 ||
+        !Number.isFinite(location.lng) || Math.abs(location.lng) > 180 ||
+        !Number.isFinite(location.time) || location.time > Date.now() || Date.now() - location.time > 600_000) {
+      return { success: true, data: null, message: '天使暂未上报有效位置，请通过电话联系' };
     }
 
     return {
@@ -124,21 +114,7 @@ export class LocationService {
       throw new ForbiddenException('无权查看');
     }
 
-    // TODO: 从轨迹表获取
-    // 这里模拟返回轨迹数据
-    return {
-      success: true,
-      data: {
-        orderId,
-        tracks: [
-          { lat: 39.9042, lng: 116.4074, time: Date.now() - 3600000 },
-          { lat: 39.9052, lng: 116.4084, time: Date.now() - 3000000 },
-          { lat: 39.9062, lng: 116.4094, time: Date.now() - 2400000 },
-          { lat: 39.9072, lng: 116.4104, time: Date.now() - 1800000 },
-          { lat: 39.9082, lng: 116.4114, time: Date.now() - 1200000 },
-        ],
-      },
-    };
+    throw new ServiceUnavailableException('服务轨迹尚未开通');
   }
 
   /**
@@ -252,15 +228,6 @@ export class LocationService {
   }
 
   // ============ 私有方法 ============
-
-  /**
-   * 记录轨迹
-   */
-  private async recordTrack(orderId: string, angelId: string, lat: number, lng: number) {
-    // TODO: 保存到轨迹表
-    // 为了不产生过多数据，可以设置最小间隔（如 30 秒）
-    console.log(`[轨迹] 订单 ${orderId} 天使位置: ${lat}, ${lng}`);
-  }
 
   /**
    * 计算两点距离（Haversine 公式）

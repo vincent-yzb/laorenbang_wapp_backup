@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as crypto from 'crypto';
+import { CreateElderlyDto, UpdateElderlyDto } from './dto/elderly.dto';
+import { validateInput } from '../auth/validate-input';
 
 @Injectable()
 export class ElderlyService {
@@ -17,17 +19,8 @@ export class ElderlyService {
   /**
    * 添加老人
    */
-  async create(userId: string, data: {
-    name: string;
-    phone: string;
-    relation: string;
-    address: string;
-    lat?: number;
-    lng?: number;
-    avatar?: string;
-    healthNote?: string;
-    angelNote?: string;
-  }) {
+  async create(userId: string, input: CreateElderlyDto) {
+    const data = validateInput(CreateElderlyDto, input);
     // 检查手机号是否已存在
     const existing = await this.prisma.elderly.findFirst({
       where: { phone: data.phone, userId },
@@ -119,17 +112,8 @@ export class ElderlyService {
   /**
    * 更新老人信息
    */
-  async update(elderlyId: string, userId: string, data: {
-    name?: string;
-    phone?: string;
-    relation?: string;
-    address?: string;
-    lat?: number;
-    lng?: number;
-    avatar?: string;
-    healthNote?: string;
-    angelNote?: string;
-  }) {
+  async update(elderlyId: string, userId: string, input: UpdateElderlyDto) {
+    const data = validateInput(UpdateElderlyDto, input);
     const elderly = await this.prisma.elderly.findUnique({
       where: { id: elderlyId },
     });

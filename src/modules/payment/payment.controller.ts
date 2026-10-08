@@ -8,7 +8,8 @@ import {
   Request,
   HttpCode,
   HttpStatus,
-  Headers,
+  Param,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
@@ -26,7 +27,17 @@ export class PaymentController {
   @ApiOperation({ summary: '创建支付订单' })
   @ApiResponse({ status: 200, description: '创建成功' })
   async createPayment(@Request() req, @Body() dto: CreatePaymentDto) {
+    this.requireRole(req, 'child');
     return this.paymentService.createPayment(req.user.id, dto);
+  }
+
+  @Get('status/:orderId')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '查询付款及订单完成状态' })
+  async getStatus(@Request() req, @Param('orderId') orderId: string) {
+    this.requireRole(req, 'child');
+    return this.paymentService.getStatus(req.user.id, orderId);
   }
 
   @Post('notify')
@@ -35,12 +46,7 @@ export class PaymentController {
   @ApiResponse({ status: 200, description: '处理成功' })
   async wechatNotify(
     @Body() body: any,
-    @Headers('Wechatpay-Timestamp') timestamp: string,
-    @Headers('Wechatpay-Nonce') nonce: string,
-    @Headers('Wechatpay-Signature') signature: string,
-    @Headers('Wechatpay-Serial') serial: string,
   ) {
-    // TODO: 验证签名
     return this.paymentService.handleWechatCallback(body);
   }
 
@@ -50,6 +56,7 @@ export class PaymentController {
   @ApiOperation({ summary: '申请退款' })
   @ApiResponse({ status: 200, description: '申请成功' })
   async refund(@Request() req, @Body() dto: RefundDto) {
+    this.requireRole(req, 'child');
     return this.paymentService.refund(req.user.id, dto);
   }
 
@@ -59,11 +66,7 @@ export class PaymentController {
   @ApiOperation({ summary: '天使提现' })
   @ApiResponse({ status: 200, description: '申请成功' })
   async withdraw(@Request() req, @Body() dto: WithdrawDto) {
-    console.log('[withdraw] 收到提现请求:', JSON.stringify({
-      userId: req.user?.id,
-      userType: req.user?.type,
-      dto,
-    }));
+    this.requireRole(req, 'angel');
     return this.paymentService.withdraw(req.user.id, dto);
   }
 
@@ -77,6 +80,11 @@ export class PaymentController {
     @Query('page') page = 1,
     @Query('pageSize') pageSize = 20,
   ) {
+    this.requireRole(req, 'angel');
     return this.paymentService.getIncomeRecords(req.user.id, +page, +pageSize);
+  }
+
+  private requireRole(req: any, role: 'child' | 'angel'): void {
+    if (req.user?.userType !== role) throw new ForbiddenException('无权执行此操作');
   }
 }

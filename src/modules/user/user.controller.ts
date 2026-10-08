@@ -10,21 +10,14 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { UserService } from './user.service';
-
-// 绑定手机号 DTO
-class BindPhoneDto {
-  phone: string;
-  code: string;
-}
-
-// 微信手机号 DTO
-class WechatPhoneDto {
-  code: string;
-}
+import { UpdateProfileDto, VerifyIdentityDto } from './dto/user.dto';
+import { BindPhoneDto, WechatPhoneDto, UserType } from '../auth/dto/auth.dto';
+import { RequireUserType, UserTypeGuard } from '../auth/user-type.guard';
 
 @ApiTags('用户')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), UserTypeGuard)
+@RequireUserType(UserType.CHILD)
 @Controller('user')
 export class UserController {
   constructor(private userService: UserService) {}
@@ -41,7 +34,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: '更新成功' })
   async updateProfile(
     @Request() req,
-    @Body() body: { name?: string; avatar?: string },
+    @Body() body: UpdateProfileDto,
   ) {
     return this.userService.updateProfile(req.user.id, body);
   }
@@ -51,12 +44,7 @@ export class UserController {
   @ApiResponse({ status: 200, description: '认证成功' })
   async verifyIdentity(
     @Request() req,
-    @Body() body: {
-      name: string;
-      idCard: string;
-      idCardFront?: string;
-      idCardBack?: string;
-    },
+    @Body() body: VerifyIdentityDto,
   ) {
     return this.userService.verifyIdentity(req.user.id, body);
   }

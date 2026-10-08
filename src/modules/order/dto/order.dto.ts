@@ -8,13 +8,18 @@ import {
   Min,
   Max,
   IsBoolean,
+  IsInt,
+  IsArray,
+  ArrayMaxSize,
+  MaxLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * 订单状态枚举
  */
 export enum OrderStatus {
-  PENDING = 'PENDING',           // 待支付
+  PENDING = 'PENDING',           // 待接单，服务后付款
   PAID = 'PAID',                 // 已支付，待接单
   ACCEPTED = 'ACCEPTED',         // 已接单
   ON_WAY = 'ON_WAY',             // 天使出发中
@@ -40,14 +45,19 @@ export class CreateOrderDto {
 
   @IsNotEmpty({ message: '服务地址不能为空' })
   @IsString()
+  @MaxLength(500)
   address: string;
 
   @IsOptional()
   @IsNumber()
+  @Min(-90)
+  @Max(90)
   lat?: number;
 
   @IsOptional()
   @IsNumber()
+  @Min(-180)
+  @Max(180)
   lng?: number;
 
   @IsNotEmpty({ message: '服务时间不能为空' })
@@ -56,7 +66,15 @@ export class CreateOrderDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   remark?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 })
+  @Min(0.01)
+  @Max(1000000)
+  price?: number; // 仅定制服务允许用户报价，普通服务以数据库价格为准
 
   @IsOptional()
   @IsBoolean()
@@ -72,9 +90,16 @@ export class QueryOrderDto {
   status?: OrderStatus;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number = 1;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   pageSize?: number = 10;
 }
 
@@ -84,10 +109,14 @@ export class QueryOrderDto {
 export class NearbyOrdersDto {
   @IsNotEmpty()
   @IsNumber()
+  @Min(-90)
+  @Max(90)
   lat: number;
 
   @IsNotEmpty()
   @IsNumber()
+  @Min(-180)
+  @Max(180)
   lng: number;
 
   @IsOptional()
@@ -103,6 +132,7 @@ export class NearbyOrdersDto {
 export class CancelOrderDto {
   @IsNotEmpty({ message: '取消原因不能为空' })
   @IsString()
+  @MaxLength(500)
   reason: string;
 }
 
@@ -118,6 +148,7 @@ export class RateOrderDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   comment?: string;
 }
 
@@ -127,9 +158,13 @@ export class RateOrderDto {
 export class CompleteServiceDto {
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   remark?: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(9)
+  @IsString({ each: true })
   images?: string[]; // 服务照片 URLs
 }
 
@@ -141,4 +176,3 @@ export interface OrderResponse {
   data?: any;
   message?: string;
 }
-

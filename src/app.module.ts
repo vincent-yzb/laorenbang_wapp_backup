@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { CatalogController } from './modules/service/catalog.controller';
 import { ConfigModule } from './config/config.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { CacheModule } from './cache/cache.module';
@@ -12,6 +14,7 @@ import { MessageModule } from './modules/message/message.module';
 import { LocationModule } from './modules/location/location.module';
 
 @Module({
+  controllers: [AppController, CatalogController],
   imports: [
     // 全局模块
     ConfigModule,

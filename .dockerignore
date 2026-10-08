@@ -1,0 +1,38 @@
+# Allow only the build inputs; local credentials and generated files stay outside
+# the Docker build context, even when new unrelated files appear in this repo.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!nest-cli.json
+!tsconfig.json
+!tsconfig.build.json
+!src/
+!src/**
+!scripts/
+!scripts/verify-build.cjs
+!prisma/
+!prisma/schema.prisma
+!prisma/migrations/
+!prisma/migrations/**
+
+# Explicit denials also apply inside an otherwise allowed source directory.
+**/.env*
+**/env.*
+**/.local
+**/.local/**
+**/.git
+**/.git/**
+**/node_modules
+**/node_modules/**
+**/dist
+**/dist/**
+**/logs
+**/logs/**
+**/*.log
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*tsbuildinfo

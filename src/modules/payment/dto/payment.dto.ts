@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsEnum, IsOptional, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsEnum, IsOptional, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -29,6 +29,7 @@ export class RefundDto {
 
   @IsNotEmpty({ message: '退款原因不能为空' })
   @IsString()
+  @MaxLength(500)
   reason: string;
 }
 
@@ -38,8 +39,9 @@ export class RefundDto {
 export class WithdrawDto {
   @IsNotEmpty({ message: '提现金额不能为空' })
   @Type(() => Number)
-  @IsNumber({}, { message: '提现金额必须是数字' })
+  @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 }, { message: '提现金额必须是有效金额，最多两位小数' })
   @Min(10, { message: '提现金额最低10元' })
+  @Max(1000000)
   amount: number;
 
   @IsNotEmpty({ message: '提现方式不能为空' })
@@ -79,4 +81,3 @@ export interface MiniProgramPayParams {
   signType: 'RSA';
   paySign: string;
 }
-

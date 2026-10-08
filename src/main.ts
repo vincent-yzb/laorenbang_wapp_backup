@@ -49,7 +49,8 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  app.enableShutdownHooks();
+  await app.listen(port, process.env.HOST || '0.0.0.0');
 
   console.log(`
 ╔════════════════════════════════════════════════════════════╗

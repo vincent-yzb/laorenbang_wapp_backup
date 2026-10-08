@@ -113,6 +113,19 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     await this.del(`sms:code:${phone}`);
   }
 
+  /** Compare and consume without an await between reads and deletion. */
+  async consumeVerificationCode(phone: string, code: string): Promise<boolean> {
+    const key = `sms:code:${phone}`;
+    const item = this.store.get(key);
+    if (!item || (item.expireAt !== null && item.expireAt <= Date.now())) {
+      this.store.delete(key);
+      return false;
+    }
+    if (item.value !== code) return false;
+    this.store.delete(key);
+    return true;
+  }
+
   /**
    * 检查发送频率（1分钟内只能发1次）
    */
@@ -139,4 +152,3 @@ export class CacheService implements OnModuleInit, OnModuleDestroy {
     return data ? JSON.parse(data) : null;
   }
 }
-

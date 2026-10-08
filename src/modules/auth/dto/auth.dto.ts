@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsMobilePhone, IsEnum, IsOptional, Length } from 'class-validator';
+import { IsString, IsNotEmpty, IsMobilePhone, IsEnum, Matches, MaxLength } from 'class-validator';
 
 /**
  * 用户类型枚举
@@ -30,7 +30,8 @@ export class PhoneLoginDto {
   phone: string;
 
   @IsNotEmpty({ message: '验证码不能为空' })
-  @Length(6, 6, { message: '验证码为6位数字' })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: '验证码为6位数字' })
   code: string;
 
   @IsEnum(UserType, { message: '用户类型无效' })
@@ -43,6 +44,7 @@ export class PhoneLoginDto {
 export class WechatLoginDto {
   @IsNotEmpty({ message: 'code 不能为空' })
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,256}$/, { message: '微信授权 code 无效' })
   code: string;
 
   @IsEnum(UserType, { message: '用户类型无效' })
@@ -55,6 +57,7 @@ export class WechatLoginDto {
 export class WechatPhoneLoginDto {
   @IsNotEmpty({ message: 'code 不能为空' })
   @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,256}$/, { message: '微信授权 code 无效' })
   code: string;
 
   @IsEnum(UserType, { message: '用户类型无效' })
@@ -67,6 +70,7 @@ export class WechatPhoneLoginDto {
 export class ElderlyLoginDto {
   @IsNotEmpty({ message: '邀请码不能为空' })
   @IsString()
+  @Matches(/^(?:[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/, { message: '邀请码为6或8位十六进制字符' })
   inviteCode: string;
 }
 
@@ -76,6 +80,7 @@ export class ElderlyLoginDto {
 export class RefreshTokenDto {
   @IsNotEmpty({ message: 'refresh_token 不能为空' })
   @IsString()
+  @MaxLength(4096)
   refreshToken: string;
 }
 
@@ -112,4 +117,20 @@ export interface LoginResponse {
     };
   };
   message?: string;
+}
+
+/** Phone ownership proof; no development bypass is accepted here. */
+export class BindPhoneDto {
+  @IsMobilePhone('zh-CN')
+  phone: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/)
+  code: string;
+}
+
+export class WechatPhoneDto {
+  @IsString()
+  @Matches(/^[A-Za-z0-9_-]{1,256}$/)
+  code: string;
 }

@@ -12,10 +12,14 @@ import {
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ElderlyService } from './elderly.service';
+import { CreateElderlyDto, UpdateElderlyDto } from './dto/elderly.dto';
+import { UserType } from '../auth/dto/auth.dto';
+import { RequireUserType, UserTypeGuard } from '../auth/user-type.guard';
 
 @ApiTags('老人管理')
 @ApiBearerAuth()
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), UserTypeGuard)
+@RequireUserType(UserType.CHILD)
 @Controller('elderly')
 export class ElderlyController {
   constructor(private elderlyService: ElderlyService) {}
@@ -25,17 +29,7 @@ export class ElderlyController {
   @ApiResponse({ status: 201, description: '添加成功' })
   async create(
     @Request() req,
-    @Body() body: {
-      name: string;
-      phone: string;
-      relation: string;
-      address: string;
-      lat?: number;
-      lng?: number;
-      avatar?: string;
-      healthNote?: string;
-      angelNote?: string;
-    },
+    @Body() body: CreateElderlyDto,
   ) {
     return this.elderlyService.create(req.user.id, body);
   }
@@ -60,17 +54,7 @@ export class ElderlyController {
   async update(
     @Request() req,
     @Param('id') id: string,
-    @Body() body: {
-      name?: string;
-      phone?: string;
-      relation?: string;
-      address?: string;
-      lat?: number;
-      lng?: number;
-      avatar?: string;
-      healthNote?: string;
-      angelNote?: string;
-    },
+    @Body() body: UpdateElderlyDto,
   ) {
     return this.elderlyService.update(id, req.user.id, body);
   }
